@@ -59,8 +59,9 @@
       // Dynamically load game.js with error handling and cache-bust
       var s = document.createElement('script');
       s.src = 'game.js?v=' + Date.now();
-      s.onerror = function() {
-        showError('game.js failed to load (404). Verify file exists at: ' + window.location.href.replace('index.html','') + 'game.js');
+      s.crossOrigin = 'anonymous';
+      s.onerror = function(e) {
+        showError('game.js failed to load (404). Verify file exists.');
       };
       s.onload = function() {
         if (typeof Game === 'undefined') {

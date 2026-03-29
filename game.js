@@ -382,104 +382,116 @@ body{height:100%;height:100dvh;overflow:hidden;background:#0c0c14;overscroll-beh
 @keyframes playerGlowT{0%,100%{box-shadow:0 0 5px #4f84,inset 0 0 3px #4f83;}50%{box-shadow:0 0 10px #4f86,inset 0 0 6px #4f84;}}
 @keyframes enemyHit{0%{filter:brightness(3);}100%{filter:brightness(1);}}
 `;
-const SFX = /* @__PURE__ */ (() => {
-  let ctx = null;
-  const getCtx = () => {
-    if (!ctx) try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {
-    }
-    return ctx;
-  };
-  const play = (freq, dur, type = "square", vol = 0.12, decay = true) => {
-    const c = getCtx();
-    if (!c) return;
-    const o = c.createOscillator();
-    const g = c.createGain();
-    o.type = type;
-    o.frequency.value = freq;
-    g.gain.value = vol;
-    if (decay) g.gain.exponentialRampToValueAtTime(1e-3, c.currentTime + dur);
-    o.connect(g);
-    g.connect(c.destination);
-    o.start(c.currentTime);
-    o.stop(c.currentTime + dur);
-  };
-  const noise = (dur, vol = 0.06) => {
-    const c = getCtx();
-    if (!c) return;
-    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * vol;
-    const s = c.createBufferSource();
-    const g = c.createGain();
-    g.gain.value = 1;
-    g.gain.exponentialRampToValueAtTime(1e-3, c.currentTime + dur);
-    s.buffer = buf;
-    s.connect(g);
-    g.connect(c.destination);
-    s.start();
-  };
-  return {
-    step: () => play(80, 0.06, "sine", 0.04),
-    hit: () => {
-      play(220, 0.08, "square", 0.1);
-      play(110, 0.12, "sawtooth", 0.06);
-    },
-    crit: () => {
-      play(330, 0.06, "square", 0.12);
-      play(440, 0.1, "square", 0.08);
-      setTimeout(() => play(550, 0.08, "square", 0.06), 60);
-    },
-    enemyHit: () => {
-      play(150, 0.1, "sawtooth", 0.08);
-      noise(0.08, 0.08);
-    },
-    miss: () => play(100, 0.15, "sine", 0.04),
-    heal: () => {
-      play(523, 0.12, "sine", 0.08);
-      setTimeout(() => play(659, 0.12, "sine", 0.08), 80);
-      setTimeout(() => play(784, 0.2, "sine", 0.06), 160);
-    },
-    levelUp: () => {
-      [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => play(f, 0.2, "sine", 0.1), i * 100));
-    },
-    death: () => {
-      [300, 250, 200, 150, 100].forEach((f, i) => setTimeout(() => play(f, 0.3, "sawtooth", 0.08), i * 120));
-    },
-    chest: () => {
-      play(880, 0.08, "sine", 0.06);
-      setTimeout(() => play(1100, 0.12, "sine", 0.08), 80);
-    },
-    boss: () => {
-      [150, 100, 150, 100, 200].forEach((f, i) => setTimeout(() => play(f, 0.2, "square", 0.1), i * 150));
-      noise(0.6, 0.05);
-    },
-    buy: () => {
-      play(660, 0.08, "sine", 0.06);
-      play(880, 0.12, "sine", 0.06);
-    },
-    flee: () => {
-      play(400, 0.06, "sine", 0.06);
-      play(300, 0.08, "sine", 0.04);
-    },
-    sanctuary: () => {
-      [440, 554, 659, 880].forEach((f, i) => setTimeout(() => play(f, 0.3, "sine", 0.07), i * 200));
-    },
-    fountain: () => {
-      play(600, 0.15, "sine", 0.06);
-      setTimeout(() => play(800, 0.2, "sine", 0.05), 100);
-    },
-    equip: () => {
-      play(300, 0.06, "square", 0.06);
-      play(450, 0.1, "square", 0.06);
-    },
-    trap: () => {
-      noise(0.15, 0.12);
-      play(100, 0.2, "sawtooth", 0.08);
-    },
-    error: () => play(150, 0.2, "square", 0.06)
-  };
+const SFX = (() => {
+  try {
+    let ctx = null;
+    const getCtx = () => {
+      if (!ctx) try {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {
+      }
+      return ctx;
+    };
+    const play = (freq, dur, type = "square", vol = 0.12, decay = true) => {
+      try {
+        const c = getCtx();
+        if (!c) return;
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = type;
+        o.frequency.value = freq;
+        g.gain.value = vol;
+        if (decay) g.gain.exponentialRampToValueAtTime(1e-3, c.currentTime + dur);
+        o.connect(g);
+        g.connect(c.destination);
+        o.start(c.currentTime);
+        o.stop(c.currentTime + dur);
+      } catch (e) {
+      }
+    };
+    const noise = (dur, vol = 0.06) => {
+      try {
+        const c = getCtx();
+        if (!c) return;
+        const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * vol;
+        const s = c.createBufferSource();
+        const g = c.createGain();
+        g.gain.value = 1;
+        g.gain.exponentialRampToValueAtTime(1e-3, c.currentTime + dur);
+        s.buffer = buf;
+        s.connect(g);
+        g.connect(c.destination);
+        s.start();
+      } catch (e) {
+      }
+    };
+    return {
+      step: () => play(80, 0.06, "sine", 0.04),
+      hit: () => {
+        play(220, 0.08, "square", 0.1);
+        play(110, 0.12, "sawtooth", 0.06);
+      },
+      crit: () => {
+        play(330, 0.06, "square", 0.12);
+        play(440, 0.1, "square", 0.08);
+        setTimeout(() => play(550, 0.08, "square", 0.06), 60);
+      },
+      enemyHit: () => {
+        play(150, 0.1, "sawtooth", 0.08);
+        noise(0.08, 0.08);
+      },
+      miss: () => play(100, 0.15, "sine", 0.04),
+      heal: () => {
+        play(523, 0.12, "sine", 0.08);
+        setTimeout(() => play(659, 0.12, "sine", 0.08), 80);
+        setTimeout(() => play(784, 0.2, "sine", 0.06), 160);
+      },
+      levelUp: () => {
+        [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => play(f, 0.2, "sine", 0.1), i * 100));
+      },
+      death: () => {
+        [300, 250, 200, 150, 100].forEach((f, i) => setTimeout(() => play(f, 0.3, "sawtooth", 0.08), i * 120));
+      },
+      chest: () => {
+        play(880, 0.08, "sine", 0.06);
+        setTimeout(() => play(1100, 0.12, "sine", 0.08), 80);
+      },
+      boss: () => {
+        [150, 100, 150, 100, 200].forEach((f, i) => setTimeout(() => play(f, 0.2, "square", 0.1), i * 150));
+        noise(0.6, 0.05);
+      },
+      buy: () => {
+        play(660, 0.08, "sine", 0.06);
+        play(880, 0.12, "sine", 0.06);
+      },
+      flee: () => {
+        play(400, 0.06, "sine", 0.06);
+        play(300, 0.08, "sine", 0.04);
+      },
+      sanctuary: () => {
+        [440, 554, 659, 880].forEach((f, i) => setTimeout(() => play(f, 0.3, "sine", 0.07), i * 200));
+      },
+      fountain: () => {
+        play(600, 0.15, "sine", 0.06);
+        setTimeout(() => play(800, 0.2, "sine", 0.05), 100);
+      },
+      equip: () => {
+        play(300, 0.06, "square", 0.06);
+        play(450, 0.1, "square", 0.06);
+      },
+      trap: () => {
+        noise(0.15, 0.12);
+        play(100, 0.2, "sawtooth", 0.08);
+      },
+      error: () => play(150, 0.2, "square", 0.06)
+    };
+  } catch (e) {
+    const noop = () => {
+    };
+    return { step: noop, hit: noop, crit: noop, enemyHit: noop, miss: noop, heal: noop, levelUp: noop, death: noop, chest: noop, boss: noop, buy: noop, flee: noop, sanctuary: noop, fountain: noop, equip: noop, trap: noop, error: noop };
+  }
 })();
 const Bar = ({ cur, max, color, label, h = 10 }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, width: "100%" } }, label && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#666", minWidth: 18, fontFamily: "'JetBrains Mono',monospace" } }, label), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: h, background: "#14141e", borderRadius: h, overflow: "hidden", border: "1px solid #222230", position: "relative" } }, /* @__PURE__ */ React.createElement("div", { style: { width: `${clamp(cur / max * 100, 0, 100)}%`, height: "100%", borderRadius: h, background: `linear-gradient(90deg,${color},${color}99)`, transition: "width .3s" } }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.min(8, h - 2), color: "#fffc", fontFamily: "'JetBrains Mono',monospace", textShadow: "0 1px 2px #000" } }, cur, "/", max)));
 const tR = (tile, fc, vis, inFov) => {
@@ -1201,6 +1213,7 @@ function Game() {
   useEffect(() => {
     if (cLogRef.current) cLogRef.current.scrollTop = cLogRef.current.scrollHeight;
   }, [cLog]);
+  const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   const saveGame = useCallback(() => {
     const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests] };
     setSave(data);
@@ -1235,7 +1248,6 @@ function Game() {
     setCInv(false);
     log("Loaded!", "system");
   }, [save, log]);
-  const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   useEffect(() => {
     if (!player) return;
     const st = { ...stats, floor: player.floor, level: player.level };
