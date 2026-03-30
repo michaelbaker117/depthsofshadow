@@ -264,9 +264,10 @@ function calcEnemyDmg(enemy, pStats, shields) {
   if (Math.random() < 0.08) dmg = Math.floor(dmg * 1.5);
   return Math.max(1, dmg);
 }
-function getBestEquip(p) {
-  const ws = p.inv.filter((i) => i.type === "weapon");
-  const ar = p.inv.filter((i) => i.type === "armor");
+function getBestEquip(p, arm = []) {
+  const allGear = [...p.inv, ...arm];
+  const ws = allGear.filter((i) => i.type === "weapon");
+  const ar = allGear.filter((i) => i.type === "armor");
   let bW = p.equipped.weapon, bA = p.equipped.armor;
   const wS = (w) => (w?.atk || 0) + (w?.dexB || 0) + (w?.intB || 0);
   const aS = (a) => (a?.def || 0) + Math.floor((a?.mpB || 0) * 0.1) + Math.floor((a?.dexB || 0) * 0.5);
@@ -1026,30 +1027,38 @@ function Game() {
     setScreen("game");
   }, [lastSanc, enterSanctuary, log]);
   const equipBest = useCallback(() => {
-    const best = getBestEquip(player);
+    const best = getBestEquip(player, armory);
     const toArmory = [];
+    const fromArmory = [];
     setPlayer((p) => {
       let np = { ...p, inv: [...p.inv] };
       if (best.weapon && best.weapon.id !== np.equipped.weapon?.id) {
         const old = np.equipped.weapon;
-        np.inv = np.inv.filter((i) => i.id !== best.weapon.id);
+        const inInv = np.inv.some((i) => i.id === best.weapon.id);
+        if (inInv) np.inv = np.inv.filter((i) => i.id !== best.weapon.id);
+        else fromArmory.push(best.weapon.id);
         if (old) toArmory.push(old);
         np.equipped = { ...np.equipped, weapon: best.weapon };
         log(`\u2B06\uFE0F ${best.weapon.icon} ${best.weapon.name}`, "info");
       }
       if (best.armor && best.armor.id !== np.equipped.armor?.id) {
         const old = np.equipped.armor;
-        np.inv = np.inv.filter((i) => i.id !== best.armor.id);
+        const inInv = np.inv.some((i) => i.id === best.armor.id);
+        if (inInv) np.inv = np.inv.filter((i) => i.id !== best.armor.id);
+        else fromArmory.push(best.armor.id);
         if (old) toArmory.push(old);
         np.equipped = { ...np.equipped, armor: best.armor };
         log(`\u2B06\uFE0F ${best.armor.icon} ${best.armor.name}`, "info");
       }
       return np;
     });
-    if (toArmory.length) setArmory((a) => [...a, ...toArmory]);
-  }, [player, log]);
+    setArmory((a) => {
+      let na = [...a, ...toArmory];
+      na = na.filter((i) => !fromArmory.includes(i.id));
+      return na;
+    });
+  }, [player, armory, log]);
   const useItem = useCallback((item, inC = false) => {
-    let didHeal = false;
     if (item.type === "consumable") {
       setPlayer((p) => {
         const ni = [...p.inv];
@@ -1061,19 +1070,16 @@ function Game() {
           const pct = item.amt >= 80 ? Math.floor(np.maxHp * 0.35) : Math.floor(np.maxHp * 0.2);
           const heal = Math.max(item.amt, pct);
           np.hp = Math.min(np.maxHp, np.hp + heal);
-          didHeal = true;
           log(`+${heal}HP`, "heal");
         }
         if (item.effect === "mp") {
           const pct = item.amt >= 60 ? Math.floor(np.maxMp * 0.35) : Math.floor(np.maxMp * 0.2);
           const heal = Math.max(item.amt, pct);
           np.mp = Math.min(np.maxMp, np.mp + heal);
-          didHeal = true;
           log(`+${heal}MP`, "heal");
         }
         if (item.effect === "cure") {
           np.poisoned = false;
-          didHeal = true;
           log("Cured!", "heal");
         }
         if (item.effect === "vision") {
@@ -1084,12 +1090,11 @@ function Game() {
           np.hp = np.maxHp;
           np.mp = np.maxMp;
           np.poisoned = false;
-          didHeal = true;
           log("Full restore!", "heal");
         }
         return np;
       });
-      if (didHeal || item.effect === "full" || item.effect === "revive" || item.effect === "hp" || item.effect === "mp" || item.effect === "cure") {
+      if (["hp", "mp", "cure", "full", "revive"].includes(item.effect)) {
         SFX.heal();
         flash("heal");
       }
@@ -1308,7 +1313,7 @@ function Game() {
         flash("heal");
         log(`\u2B06\uFE0F LEVEL ${np.level}!`, "levelup");
       }
-      if (e.isBoss) {
+      if (e.isBoss && !e.isBarrier && !e.isMini) {
         const bf = e.bossFloor || player.floor;
         const uw = genFloorWeapon(bf, np.cls);
         const ua = genFloorArmor(bf, np.cls);
@@ -1325,7 +1330,7 @@ function Game() {
       }
       return np;
     });
-    if (e.isBoss) setBossAlive(false);
+    if (e.isBoss && !e.isBarrier && !e.isMini) setBossAlive(false);
     setWand((p) => p.filter((w) => w.id !== e.id));
     setStats((p) => ({ ...p, kills: p.kills + 1, totG: p.totG + e.gold, megaK: p.megaK + (e.isMega ? 1 : 0), erebus: p.erebus || e.name === "Erebus" }));
     log(`${e.isBoss ? "\u{1F3C6}" : "\u2694\uFE0F"} ${e.name}! +${xpG}xp +${e.gold}g`, "victory");
@@ -1484,23 +1489,22 @@ function Game() {
       nextFloor();
       return;
     }
-    if (!inSanc && bossAlive && dun.bossPos && nx === dun.bossPos.x && ny === dun.bossPos.y) {
-      if (subArea && dun.hasMini) {
-        const mini = getMiniBoss(player.floor);
-        startCombat(mini);
-        return;
-      } else if (!subArea) {
-        const boss = player.floor % 10 === 0 ? getMegaBoss(player.floor) : getFloorBoss(player.floor);
-        startCombat(boss);
-        return;
-      }
+    if (subArea && dun.hasMini && dun.bossPos && nx === dun.bossPos.x && ny === dun.bossPos.y) {
+      const mini = getMiniBoss(player.floor);
+      startCombat(mini);
+      return;
+    }
+    if (!inSanc && !subArea && bossAlive && dun.bossPos && nx === dun.bossPos.x && ny === dun.bossPos.y) {
+      const boss = player.floor % 10 === 0 ? getMegaBoss(player.floor) : getFloorBoss(player.floor);
+      startCombat(boss);
+      return;
     }
     const hit = wand.find((e) => e.x === nx && e.y === ny);
     if (hit) {
       startCombat(hit);
       return;
     }
-    if (!inSanc && bossAlive && tile === T.FLOOR && Math.random() < 0.08) {
+    if (!inSanc && !subArea && bossAlive && tile === T.FLOOR && Math.random() < 0.08) {
       startCombat(getEnemy(player.floor));
       return;
     }
@@ -1524,15 +1528,19 @@ function Game() {
         if (e.key === "Escape") setMenu(null);
         return;
       }
-      const m = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] };
-      if (m[e.key]) {
+      const moveKeys = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] };
+      if (moveKeys[e.key]) {
         e.preventDefault();
-        move(...m[e.key]);
+        move(...moveKeys[e.key]);
+        return;
       }
-      if (k === keybinds.inv) setMenu((x) => x === "inv" ? null : "inv");
-      if (k === keybinds.stats) setMenu((x) => x === "stats" ? null : "stats");
-      if (k === keybinds.quests) setMenu((x) => x === "obj" ? null : "obj");
-      if (k === keybinds.armory) setMenu((x) => x === "armory" ? null : "armory");
+      const isMove = "wasd".includes(k) || e.key.startsWith("Arrow");
+      if (!isMove) {
+        if (k === keybinds.inv) setMenu((x) => x === "inv" ? null : "inv");
+        else if (k === keybinds.stats) setMenu((x) => x === "stats" ? null : "stats");
+        else if (k === keybinds.quests) setMenu((x) => x === "obj" ? null : "obj");
+        else if (k === keybinds.armory) setMenu((x) => x === "armory" ? null : "armory");
+      }
       if (e.key === "Escape") setMenu(null);
     };
     window.addEventListener("keydown", h);
@@ -1546,8 +1554,15 @@ function Game() {
   }, [cLog]);
   const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   const saveGame = useCallback((slot) => {
+    if (subArea) {
+      setDun(subArea.parentDun);
+      setPlayer((p) => ({ ...p, x: subArea.parentPos.x, y: subArea.parentPos.y }));
+      setWand(subArea.parentWand || []);
+      setSubArea(null);
+      log("Returned from hidden area (auto-save)", "system");
+    }
     const sl = slot || activeSlot;
-    const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
+    const data = { player, dun: { ...subArea ? subArea.parentDun : dun }, wand: subArea ? subArea.parentWand || [] : wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
     setSave((prev) => {
       const ns = [...prev];
       ns[sl] = data;
@@ -1558,7 +1573,7 @@ function Game() {
     } catch (e) {
     }
     log(`Saved to slot ${sl}!`, "system");
-  }, [player, dun, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests, armory, activeSlot, log]);
+  }, [player, dun, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests, armory, activeSlot, subArea, log]);
   const loadGame = useCallback((slot) => {
     const sl = slot || activeSlot;
     const s = save[sl] || (() => {
@@ -1612,7 +1627,7 @@ function Game() {
     }
   }, [stats.kills, stats.chests, player?.floor, player?.level]);
   useEffect(() => {
-    if (player && dun && screen === "game") {
+    if (player && dun && screen === "game" && !subArea) {
       const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
       setSave((prev) => {
         const ns = [...prev];
@@ -1629,23 +1644,24 @@ function Game() {
   const computed = useMemo(() => player ? calcStats(player) : null, [player]);
   useEffect(() => {
     if (screen === "game" && player && settings.music) {
-      BGM.play(getTier(player.floor), inSanc);
+      if (subArea) BGM.play(getTier(player.floor), false);
+      else BGM.play(getTier(player.floor), inSanc);
     } else {
       BGM.stop();
     }
-  }, [screen, player?.floor, inSanc, settings.music]);
+  }, [screen, player?.floor, inSanc, subArea, settings.music]);
   const fc = dun?.fc || (inSanc ? SANC_CONFIG : FLOOR_CONFIGS[0]);
   const logCol = (t) => ({ danger: "#e54", heal: "#4c6", loot: "#ea3", victory: "#d4a843", levelup: "#c4c", system: "#58c" })[t] || "#667";
   const recW = useMemo(() => {
     if (!player) return null;
-    const b = getBestEquip(player);
+    const b = getBestEquip(player, armory);
     return b.weapon && b.weapon.id !== player.equipped.weapon?.id ? b.weapon : null;
-  }, [player]);
+  }, [player, armory]);
   const recA = useMemo(() => {
     if (!player) return null;
-    const b = getBestEquip(player);
+    const b = getBestEquip(player, armory);
     return b.armor && b.armor.id !== player.equipped.armor?.id ? b.armor : null;
-  }, [player]);
+  }, [player, armory]);
   const hasRec = recW || recA;
   const btnS = { padding: "7px 12px", background: "#111119", border: "1px solid #2a2a3a", color: "#888", borderRadius: 7, fontSize: 10, cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", touchAction: "manipulation" };
   const fullScreen = (bg, ch) => /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", marginLeft: "env(safe-area-inset-left,0px)", marginRight: "env(safe-area-inset-right,0px)", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", userSelect: "none", padding: 24 } }, /* @__PURE__ */ React.createElement("style", null, CSS), ch));
@@ -1744,7 +1760,11 @@ function Game() {
     const eqA = player.equipped.armor;
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 10, fontFamily: "'Cinzel',serif" } }, "INVENTORY ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#666" } }, "(", player.inv.length, ")")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "EQUIPPED"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", padding: "8px 10px", background: "#0e0e1a", borderRadius: 8, border: "1px solid #2a2a3a", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u{1F5E1}\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11 } }, eqW ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "#ddd" } }, eqW.icon, " ", eqW.name), eqW.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", eqW.floor), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#c64", fontSize: 9 } }, "+", eqW.atk, "ATK", eqW.intB ? ` +${eqW.intB}INT` : "", eqW.dexB ? ` +${eqW.dexB}DEX` : "")) : /* @__PURE__ */ React.createElement("span", { style: { color: "#444" } }, "None"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", padding: "8px 10px", background: "#0e0e1a", borderRadius: 8, border: "1px solid #2a2a3a", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u{1F6E1}\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11 } }, eqA ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "#ddd" } }, eqA.icon, " ", eqA.name), eqA.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", eqA.floor), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#68c", fontSize: 9 } }, "+", eqA.def, "DEF", eqA.mpB ? ` +${eqA.mpB}MP` : "", eqA.dexB ? ` +${eqA.dexB}DEX` : "")) : /* @__PURE__ */ React.createElement("span", { style: { color: "#444" } }, "None")))), hasRec && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, width: "100%", marginBottom: 12, padding: "10px 0", textAlign: "center", borderColor: "#4c66", color: "#4c6", background: "#0a1a0e", fontSize: 11, animation: "recB 2s infinite" }, onClick: equipBest }, "\u2B06\uFE0F EQUIP BEST", recW ? ` \u{1F5E1}\uFE0F${recW.name}` : "", recA ? ` \u{1F6E1}\uFE0F${recA.name}` : ""), sortedGear.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c64", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #c6422", paddingBottom: 4 } }, "GEAR ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, "(", sortedGear.length, ")")), sortedGear.map((item) => {
       const isR = recW && item.id === recW.id || recA && item.id === recA.id;
-      return /* @__PURE__ */ React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: isR ? "#0c1a0e" : "#0c0c16", borderRadius: 8, border: `1px solid ${isR ? "#4c63" : "#1e1e2e"}`, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: isR ? "#8d8" : "#ccc" } }, item.icon, " ", item.name), item.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", item.floor), isR && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#4c6", marginLeft: 4 } }, "\u2B06\uFE0F"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, item.type === "weapon" ? `+${item.atk}ATK${item.intB ? ` +${item.intB}INT` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : item.type === "armor" ? `+${item.def}DEF${item.mpB ? ` +${item.mpB}MP` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 10px", borderColor: isR ? "#4c64" : "#2a2a3a", color: isR ? "#4c6" : "#888" }, onClick: () => useItem(item) }, "Equip"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#d4a843" }, onClick: () => {
+      return /* @__PURE__ */ React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: isR ? "#0c1a0e" : "#0c0c16", borderRadius: 8, border: `1px solid ${isR ? "#4c63" : "#1e1e2e"}`, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: isR ? "#8d8" : "#ccc" } }, item.icon, " ", item.name), item.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", item.floor), isR && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#4c6", marginLeft: 4 } }, "\u2B06\uFE0F"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, item.type === "weapon" ? `+${item.atk}ATK${item.intB ? ` +${item.intB}INT` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : item.type === "armor" ? `+${item.def}DEF${item.mpB ? ` +${item.mpB}MP` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", borderColor: isR ? "#4c64" : "#2a2a3a", color: isR ? "#4c6" : "#888" }, onClick: () => useItem(item) }, "Equip"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 8, padding: "3px 6px", color: "#68c" }, onClick: () => {
+        setPlayer((p) => ({ ...p, inv: p.inv.filter((i) => i.id !== item.id) }));
+        setArmory((a) => [...a, item]);
+        log(`Stashed ${item.name}`, "info");
+      } }, "Stash"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 6px", color: "#d4a843" }, onClick: () => {
         const v = Math.floor(item.val / 2);
         setPlayer((p) => ({ ...p, inv: p.inv.filter((i) => i.id !== item.id), gold: p.gold + v }));
         log(`Sold ${item.name} ${v}g`, "info");
