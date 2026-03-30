@@ -1,5 +1,5 @@
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
-const T = { WALL: 0, FLOOR: 1, STAIRS: 2, TRAP: 3, CHEST: 4, SECRET: 5, PIT: 6, FIRE: 7, FOUNTAIN: 8, ICE: 10, LAVA: 11, WATER: 12, VOID: 13, SHOP: 14 };
+const T = { WALL: 0, FLOOR: 1, STAIRS: 2, TRAP: 3, CHEST: 4, SECRET: 5, PIT: 6, FIRE: 7, FOUNTAIN: 8, ICE: 10, LAVA: 11, WATER: 12, VOID: 13, SHOP: 14, PORTAL: 15, BARRIER: 16 };
 const MW = 50, MH = 36, VR = 5;
 const rng = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -339,10 +339,85 @@ function genDungeon(f, isSanc = false) {
     for (let i = 0; i < rng(3, 5 + Math.floor(f / 5)); i++) plc(rng(1, Math.max(1, bri - 1)), T.TRAP);
     for (let i = 0; i < rng(0, 2); i++) plc(rng(1, Math.max(1, bri - 1)), T.FOUNTAIN);
     for (let i = 0; i < rng(1, Math.floor(f / 8) + 3); i++) plc(rng(1, Math.max(1, bri - 1)), fc.haz);
+    if (!isMega && rooms.length > 3) {
+      for (let i = 0; i < rng(1, 2); i++) {
+        const ri = rng(1, Math.max(1, bri - 2));
+        plc(ri, T.BARRIER);
+      }
+    }
   }
   const start = { x: rooms[0].cx, y: rooms[0].cy };
   map[start.y][start.x] = T.FLOOR;
   return { map, rooms, revealed: rev, start, stairsPos, bossPos, bri, fc, isMega, isSanc };
+}
+function genSubArea(f) {
+  const fc = getFC(f);
+  const map = Array.from({ length: MH }, () => Array(MW).fill(T.WALL));
+  const rooms = [];
+  const ox = Math.floor(MW / 4), oy = Math.floor(MH / 4);
+  const sw = Math.floor(MW / 2), sh = Math.floor(MH / 2);
+  for (let a = 0; a < 60; a++) {
+    if (rooms.length >= rng(3, 5)) break;
+    const rw = rng(4, 7), rh = rng(3, 5), rx = ox + rng(1, sw - rw - 2), ry = oy + rng(1, sh - rh - 2);
+    let ok = true;
+    for (const r of rooms) if (rx < r.x + r.w + 2 && rx + rw + 2 > r.x && ry < r.y + r.h + 2 && ry + rh + 2 > r.y) {
+      ok = false;
+      break;
+    }
+    if (!ok) continue;
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) if (y >= 0 && y < MH && x >= 0 && x < MW) map[y][x] = T.FLOOR;
+    rooms.push({ x: rx, y: ry, w: rw, h: rh, cx: Math.floor(rx + rw / 2), cy: Math.floor(ry + rh / 2) });
+  }
+  if (rooms.length < 2) {
+    const r1 = { x: ox + 2, y: oy + 2, w: 6, h: 4, cx: ox + 5, cy: oy + 4 };
+    const r2 = { x: ox + 12, y: oy + 8, w: 6, h: 4, cx: ox + 15, cy: oy + 10 };
+    [r1, r2].forEach((r) => {
+      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (y >= 0 && y < MH && x >= 0 && x < MW) map[y][x] = T.FLOOR;
+      rooms.push(r);
+    });
+  }
+  for (let i = 0; i < rooms.length - 1; i++) {
+    let { cx: x1, cy: y1 } = rooms[i], { cx: x2, cy: y2 } = rooms[i + 1];
+    while (x1 !== x2) {
+      if (y1 >= 0 && y1 < MH && x1 >= 0 && x1 < MW && map[y1][x1] === T.WALL) map[y1][x1] = T.FLOOR;
+      x1 += x1 < x2 ? 1 : -1;
+    }
+    while (y1 !== y2) {
+      if (y1 >= 0 && y1 < MH && x1 >= 0 && x1 < MW && map[y1][x1] === T.WALL) map[y1][x1] = T.FLOOR;
+      y1 += y1 < y2 ? 1 : -1;
+    }
+    if (y1 >= 0 && y1 < MH && x1 >= 0 && x1 < MW && map[y1][x1] === T.WALL) map[y1][x1] = T.FLOOR;
+  }
+  const plc = (ri, t) => {
+    const r = rooms[ri];
+    if (!r) return null;
+    for (let a = 0; a < 20; a++) {
+      const px = rng(r.x + 1, r.x + r.w - 2), py = rng(r.y + 1, r.y + r.h - 2);
+      if (py >= 0 && py < MH && px >= 0 && px < MW && map[py][px] === T.FLOOR) {
+        map[py][px] = t;
+        return { x: px, y: py };
+      }
+    }
+    return null;
+  };
+  plc(0, T.PORTAL);
+  const lri = rooms.length - 1;
+  for (let i = 0; i < rng(2, 4); i++) plc(lri, T.CHEST);
+  for (let i = 0; i < rng(2, 4); i++) plc(rng(0, lri), T.TRAP);
+  const hasMini = Math.random() < 0.5;
+  const miniPos = hasMini ? { x: rooms[lri].cx, y: rooms[lri].cy } : null;
+  const rev = Array.from({ length: MH }, () => Array(MW).fill(false));
+  const start = { x: rooms[0].cx, y: rooms[0].cy };
+  map[start.y][start.x] = T.FLOOR;
+  return { map, rooms, revealed: rev, start, miniPos, hasMini, fc: { ...fc, name: "Hidden Area", icon: "\u{1F52E}" }, isSub: true, bossPos: miniPos, bri: lri };
+}
+function getMiniBoss(f) {
+  const t = getTier(f);
+  const names = ["Vault Guardian", "Shadow Sentinel", "Cursed Watcher", "Rune Golem", "Treasure Fiend", "Frost Keeper", "Void Lurker", "Drake Warden", "Eye Stalker", "Dark Champion"];
+  const icons = ["\u{1F6E1}\uFE0F", "\u{1F464}", "\u{1F441}\uFE0F", "\u{1FAA8}", "\u{1F608}", "\u2744\uFE0F", "\u{1F300}", "\u{1F432}", "\u{1F441}\uFE0F", "\u2694\uFE0F"];
+  const i = Math.min(t - 1, 9);
+  const s = 1 + (f - 1) % 10 * 0.12;
+  return { name: names[i], icon: icons[i], hp: Math.floor(120 * s * t * 0.6), maxHp: Math.floor(120 * s * t * 0.6), atk: Math.floor(20 * s * t * 0.5), def: Math.floor(12 * s * t * 0.4), xp: Math.floor(80 * s * t), gold: Math.floor(60 * s * t), id: uid(), isBoss: true, isMini: true, bossFloor: f, subtitle: "Sub-area Guardian" };
 }
 function revA(rev, px, py, r) {
   const n = rev.map((r2) => [...r2]);
@@ -649,7 +724,7 @@ const Bar = ({ cur, max, color, label, h = 10 }) => /* @__PURE__ */ React.create
 const tR = (tile, fc, vis, inFov) => {
   if (!vis) return { ch: "\xB7", color: "#080808", o: 0.1 };
   const o = inFov ? 1 : 0.25;
-  const m = { [T.WALL]: { ch: "\u2588", color: fc.wall }, [T.FLOOR]: { ch: "\xB7", color: fc.floor + "99" }, [T.STAIRS]: { ch: "\u25BC", color: "#0e7", g: "0 0 4px #0e75" }, [T.TRAP]: { ch: "\xB7", color: fc.floor + "99" }, [T.CHEST]: { ch: "\u25C6", color: "#fa0", g: "0 0 4px #fa04" }, [T.SECRET]: { ch: "\u2588", color: fc.wall }, [T.PIT]: { ch: "\u25CB", color: "#500" }, [T.FIRE]: { ch: "\u2248", color: "#f40", g: "0 0 3px #f404" }, [T.FOUNTAIN]: { ch: "\u2666", color: "#48f", g: "0 0 4px #48f4" }, [T.ICE]: { ch: "\u25AA", color: "#8df" }, [T.LAVA]: { ch: "\u2248", color: "#f30", g: "0 0 3px #f304" }, [T.WATER]: { ch: "~", color: "#26a" }, [T.VOID]: { ch: "\u221E", color: "#84c", g: "0 0 3px #84c4" }, [T.SHOP]: { ch: "$", color: "#fa0", g: "0 0 5px #fa06" } };
+  const m = { [T.WALL]: { ch: "\u2588", color: fc.wall }, [T.FLOOR]: { ch: "\xB7", color: fc.floor + "99" }, [T.STAIRS]: { ch: "\u25BC", color: "#0e7", g: "0 0 4px #0e75" }, [T.TRAP]: { ch: "\xB7", color: fc.floor + "99" }, [T.CHEST]: { ch: "\u25C6", color: "#fa0", g: "0 0 4px #fa04" }, [T.SECRET]: { ch: "\u2588", color: fc.wall }, [T.PIT]: { ch: "\u25CB", color: "#500" }, [T.FIRE]: { ch: "\u2248", color: "#f40", g: "0 0 3px #f404" }, [T.FOUNTAIN]: { ch: "\u2666", color: "#48f", g: "0 0 4px #48f4" }, [T.ICE]: { ch: "\u25AA", color: "#8df" }, [T.LAVA]: { ch: "\u2248", color: "#f30", g: "0 0 3px #f304" }, [T.WATER]: { ch: "~", color: "#26a" }, [T.VOID]: { ch: "\u221E", color: "#84c", g: "0 0 3px #84c4" }, [T.SHOP]: { ch: "$", color: "#fa0", g: "0 0 5px #fa06" }, [T.PORTAL]: { ch: "\u2295", color: "#d4f", g: "0 0 6px #d4f6" }, [T.BARRIER]: { ch: "\u2593", color: "#f84", g: "0 0 4px #f844" } };
   return { ...m[tile] || { ch: "?", color: "#333" }, o };
 };
 function DPad({ accent, onDir, combatActive }) {
@@ -744,7 +819,14 @@ function Game() {
     setVfx((v) => ({ ...v, enemyHit: true }));
     setTimeout(() => setVfx((v) => ({ ...v, enemyHit: false })), 200);
   }, []);
-  const [settings, setSettings] = useState({ difficulty: "normal", tileSize: 13, minimap: true, music: true, sfx: true });
+  const [settings, setSettings] = useState(() => {
+    try {
+      const s = localStorage.getItem("dos_settings");
+      return s ? { ...{ difficulty: "normal", tileSize: 13, minimap: true, music: true, sfx: true }, ...JSON.parse(s) } : { difficulty: "normal", tileSize: 13, minimap: true, music: true, sfx: true };
+    } catch (e) {
+      return { difficulty: "normal", tileSize: 13, minimap: true, music: true, sfx: true };
+    }
+  });
   const [player, setPlayer] = useState(null);
   const [dun, setDun] = useState(null);
   const [wand, setWand] = useState([]);
@@ -768,6 +850,28 @@ function Game() {
   const [pendingDeath, setPendingDeath] = useState(false);
   const [shop, setShop] = useState(null);
   const [cInv, setCInv] = useState(false);
+  const [armory, setArmory] = useState([]);
+  const [subArea, setSubArea] = useState(null);
+  const [keybinds, setKeybinds] = useState(() => {
+    try {
+      const k = localStorage.getItem("dos_keybinds");
+      return k ? JSON.parse(k) : { inv: "i", stats: "c", quests: "q", armory: "r" };
+    } catch (e) {
+      return { inv: "i", stats: "c", quests: "q", armory: "r" };
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("dos_settings", JSON.stringify(settings));
+    } catch (e) {
+    }
+  }, [settings]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("dos_keybinds", JSON.stringify(keybinds));
+    } catch (e) {
+    }
+  }, [keybinds]);
   const [isLand, setIsLand] = useState(() => typeof window !== "undefined" && window.innerWidth > window.innerHeight);
   const [isDesk, setIsDesk] = useState(() => typeof window !== "undefined" && !("ontouchstart" in window) && window.innerWidth >= 1024);
   const [winSize, setWinSize] = useState(() => typeof window !== "undefined" ? { w: window.innerWidth, h: window.innerHeight } : { w: 1024, h: 768 });
@@ -823,6 +927,8 @@ function Game() {
     setStats({ kills: 0, chests: 0, totG: 0, megaK: 0, erebus: false, steps: 0 });
     setPendingDeath(false);
     setCompletedQuests(/* @__PURE__ */ new Set());
+    setArmory([]);
+    setSubArea(null);
     setELog([{ m: `${base.name} enters. Floor 1 \u2014 ${d.fc.name} ${d.fc.icon}`, ty: "system", ts: Date.now() }]);
     setCombat(null);
     setMenu(null);
@@ -921,24 +1027,26 @@ function Game() {
   }, [lastSanc, enterSanctuary, log]);
   const equipBest = useCallback(() => {
     const best = getBestEquip(player);
+    const toArmory = [];
     setPlayer((p) => {
       let np = { ...p, inv: [...p.inv] };
       if (best.weapon && best.weapon.id !== np.equipped.weapon?.id) {
         const old = np.equipped.weapon;
         np.inv = np.inv.filter((i) => i.id !== best.weapon.id);
-        if (old) np.inv.push(old);
+        if (old) toArmory.push(old);
         np.equipped = { ...np.equipped, weapon: best.weapon };
         log(`\u2B06\uFE0F ${best.weapon.icon} ${best.weapon.name}`, "info");
       }
       if (best.armor && best.armor.id !== np.equipped.armor?.id) {
         const old = np.equipped.armor;
         np.inv = np.inv.filter((i) => i.id !== best.armor.id);
-        if (old) np.inv.push(old);
+        if (old) toArmory.push(old);
         np.equipped = { ...np.equipped, armor: best.armor };
         log(`\u2B06\uFE0F ${best.armor.icon} ${best.armor.name}`, "info");
       }
       return np;
     });
+    if (toArmory.length) setArmory((a) => [...a, ...toArmory]);
   }, [player, log]);
   const useItem = useCallback((item, inC = false) => {
     let didHeal = false;
@@ -1002,7 +1110,7 @@ function Game() {
       setPlayer((p) => {
         const old = p.equipped.weapon;
         const ni = p.inv.filter((i) => i.id !== item.id);
-        if (old) ni.push(old);
+        if (old) setArmory((a) => [...a, old]);
         log(`Equipped ${item.name}`, "info");
         return { ...p, inv: ni, equipped: { ...p.equipped, weapon: item } };
       });
@@ -1011,7 +1119,7 @@ function Game() {
       setPlayer((p) => {
         const old = p.equipped.armor;
         const ni = p.inv.filter((i) => i.id !== item.id);
-        if (old) ni.push(old);
+        if (old) setArmory((a) => [...a, old]);
         log(`Equipped ${item.name}`, "info");
         return { ...p, inv: ni, equipped: { ...p.equipped, armor: item } };
       });
@@ -1226,6 +1334,15 @@ function Game() {
       setPlayer((p) => ({ ...p, inv: [...p.inv, l] }));
       log(`Drop: ${l.icon} ${l.name}`, "loot");
     }
+    if (e.isBarrier && e.barrierX !== void 0) {
+      setDun((d) => {
+        const nm = d.map.map((r) => [...r]);
+        nm[e.barrierY][e.barrierX] = T.PORTAL;
+        return { ...d, map: nm };
+      });
+      log("\u{1F52E} A portal appears!", "loot");
+      SFX.chest();
+    }
     setCombat(null);
   }, [combat, player, settings, log]);
   const move = useCallback((dx, dy) => {
@@ -1322,7 +1439,43 @@ function Game() {
       log(`${s.icon} ${s.name}: "Browse my wares!"`, "system");
       return;
     }
+    if (tile === T.BARRIER) {
+      const guardian = getMiniBoss(player.floor);
+      SFX.boss();
+      log(`\u26A0\uFE0F Barrier Guardian blocks the way!`, "danger");
+      startCombat({ ...guardian, isBarrier: true, barrierX: nx, barrierY: ny });
+      return;
+    }
+    if (tile === T.PORTAL) {
+      if (subArea) {
+        setDun(subArea.parentDun);
+        setPlayer((p) => ({ ...p, x: subArea.parentPos.x, y: subArea.parentPos.y }));
+        setWand(subArea.parentWand || []);
+        setSubArea(null);
+        SFX.sanctuary();
+        flash("heal");
+        log("\u{1F52E} Returned from hidden area!", "system");
+        return;
+      } else {
+        const sub = genSubArea(player.floor);
+        sub.revealed = revA(sub.revealed, sub.start.x, sub.start.y, player.vr + player.torchB);
+        const parentWand = [...wand];
+        setSubArea({ parentDun: dun, parentPos: { x: player.x, y: player.y }, parentWand });
+        setDun(sub);
+        setPlayer((p) => ({ ...p, x: sub.start.x, y: sub.start.y }));
+        const subEnemies = sub.hasMini ? [] : [];
+        setWand(subEnemies);
+        SFX.boss();
+        flash("loot");
+        log("\u{1F52E} Entered hidden sub-area!", "system");
+        return;
+      }
+    }
     if (tile === T.STAIRS) {
+      if (subArea) {
+        log("Find the portal \u2295 to exit!", "system");
+        return;
+      }
       if (!inSanc && bossAlive) {
         const boss = player.floor % 10 === 0 ? getMegaBoss(player.floor) : getFloorBoss(player.floor);
         startCombat(boss);
@@ -1332,9 +1485,15 @@ function Game() {
       return;
     }
     if (!inSanc && bossAlive && dun.bossPos && nx === dun.bossPos.x && ny === dun.bossPos.y) {
-      const boss = player.floor % 10 === 0 ? getMegaBoss(player.floor) : getFloorBoss(player.floor);
-      startCombat(boss);
-      return;
+      if (subArea && dun.hasMini) {
+        const mini = getMiniBoss(player.floor);
+        startCombat(mini);
+        return;
+      } else if (!subArea) {
+        const boss = player.floor % 10 === 0 ? getMegaBoss(player.floor) : getFloorBoss(player.floor);
+        startCombat(boss);
+        return;
+      }
     }
     const hit = wand.find((e) => e.x === nx && e.y === ny);
     if (hit) {
@@ -1347,10 +1506,11 @@ function Game() {
     }
     if (player.poisoned) setPlayer((p) => ({ ...p, hp: Math.max(1, p.hp - 2) }));
     if (!inSanc) moveW();
-  }, [player, dun, combat, menu, shop, wand, bossAlive, inSanc, nextFloor, startCombat, moveW, log, shk]);
+  }, [player, dun, combat, menu, shop, wand, bossAlive, inSanc, subArea, nextFloor, startCombat, moveW, log, shk]);
   useEffect(() => {
     const h = (e) => {
       if (screen !== "game") return;
+      const k = e.key.toLowerCase();
       if (shop) {
         if (e.key === "Escape") setShop(null);
         return;
@@ -1369,12 +1529,15 @@ function Game() {
         e.preventDefault();
         move(...m[e.key]);
       }
-      if (e.key === "i" || e.key === "I") setMenu((x) => x === "inv" ? null : "inv");
+      if (k === keybinds.inv) setMenu((x) => x === "inv" ? null : "inv");
+      if (k === keybinds.stats) setMenu((x) => x === "stats" ? null : "stats");
+      if (k === keybinds.quests) setMenu((x) => x === "obj" ? null : "obj");
+      if (k === keybinds.armory) setMenu((x) => x === "armory" ? null : "armory");
       if (e.key === "Escape") setMenu(null);
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [screen, combat, menu, shop, move, claimWin, handleDeath]);
+  }, [screen, combat, menu, shop, move, claimWin, handleDeath, keybinds]);
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [eLog]);
@@ -1384,7 +1547,7 @@ function Game() {
   const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   const saveGame = useCallback((slot) => {
     const sl = slot || activeSlot;
-    const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], ts: Date.now() };
+    const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
     setSave((prev) => {
       const ns = [...prev];
       ns[sl] = data;
@@ -1395,7 +1558,7 @@ function Game() {
     } catch (e) {
     }
     log(`Saved to slot ${sl}!`, "system");
-  }, [player, dun, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests, activeSlot, log]);
+  }, [player, dun, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests, armory, activeSlot, log]);
   const loadGame = useCallback((slot) => {
     const sl = slot || activeSlot;
     const s = save[sl] || (() => {
@@ -1417,6 +1580,8 @@ function Game() {
     setInSanc(s.inSanc);
     setLastSanc(s.lastSanc);
     if (s.completedQuests) setCompletedQuests(new Set(s.completedQuests));
+    if (s.armory) setArmory(s.armory);
+    setSubArea(null);
     setCombat(null);
     setMenu(null);
     setPendingDeath(false);
@@ -1448,7 +1613,7 @@ function Game() {
   }, [stats.kills, stats.chests, player?.floor, player?.level]);
   useEffect(() => {
     if (player && dun && screen === "game") {
-      const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], ts: Date.now() };
+      const data = { player, dun: { ...dun }, wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
       setSave((prev) => {
         const ns = [...prev];
         ns[activeSlot] = data;
@@ -1545,12 +1710,14 @@ function Game() {
       else if (t === T.CHEST) c = "#ea0";
       else if (t === T.FOUNTAIN) c = "#48f";
       else if (t === T.SHOP) c = "#fa0";
+      else if (t === T.PORTAL) c = "#d4f";
+      else if (t === T.BARRIER) c = "#f84";
       else if (t === T.WALL) c = fc.wall;
       if (x === player.x && y === player.y) c = "#ffd700";
       miniDots.push(/* @__PURE__ */ React.createElement("div", { key: `${x}-${y}`, style: { position: "absolute", left: x * mmS, top: y * mmS, width: mmS, height: mmS, background: c } }));
     }
   }
-  return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000", position: "relative", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, bottom: 0, left: "env(safe-area-inset-left,0px)", right: "env(safe-area-inset-right,0px)", overflow: "hidden", background: fc.bg, color: "#c8c8d0", fontFamily: "'JetBrains Mono',monospace" } }, /* @__PURE__ */ React.createElement("style", null, CSS, `:root{--ac:${fc.accent};}`), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", animation: shaking ? "shake .2s" : inSanc ? "sancP 4s infinite" : "none" } }, /* @__PURE__ */ React.createElement("table", { style: { borderCollapse: "collapse" } }, /* @__PURE__ */ React.createElement("tbody", null, mapRows))), vfx.flash && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none", animation: "dmgFlash .3s forwards", background: vfx.flash === "damage" ? "rgba(255,40,40,.15)" : vfx.flash === "heal" ? "rgba(40,255,100,.12)" : "rgba(255,200,40,.12)" } }), vfx.particles.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 4, pointerEvents: "none" } }, vfx.particles.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { position: "absolute", width: 6, height: 6, borderRadius: "50%", background: p.color, boxShadow: `0 0 4px ${p.color}`, animation: `particle ${p.dur}s ease-out forwards`, "--px": `${p.px}px`, "--py": `${p.py}px` } }))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, left: isDesk ? 16 : 6, zIndex: 10, display: "flex", flexDirection: "column", gap: isDesk ? Math.round(5 * uiS) : 3, width: isDesk ? Math.round(180 * uiS) : 160, pointerEvents: "none" } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.hp, max: player.maxHp, color: "#c33", label: "HP", h: isDesk ? Math.round(12 * uiS) : 8 }), /* @__PURE__ */ React.createElement(Bar, { cur: player.mp, max: player.maxMp, color: "#36c", label: "MP", h: isDesk ? Math.round(12 * uiS) : 8 }), /* @__PURE__ */ React.createElement(Bar, { cur: player.xp, max: xpFor(player.level), color: "#74a", label: "XP", h: isDesk ? Math.round(10 * uiS) : 6 }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: isDesk ? Math.round(10 * uiS) : 8, color: "#888", paddingTop: 1 } }, /* @__PURE__ */ React.createElement("span", null, fc.icon, " F", player.floor, " Lv", player.level), /* @__PURE__ */ React.createElement("span", null, "\u{1F441}", player.vr + player.torchB, "/", player.vr + 3, " \u{1F4B0}", player.gold))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, right: isDesk ? 16 : 6, zIndex: 20, display: "flex", flexDirection: "column", gap: isDesk ? 6 : 4, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMenu((m) => m ? null : "open"), style: { width: isDesk ? Math.round(40 * uiS) : 42, height: isDesk ? Math.round(40 * uiS) : 42, borderRadius: 10, background: "rgba(14,14,22,.65)", border: `1px solid ${fc.accent}33`, color: menu ? fc.accent : "#888", fontSize: isDesk ? Math.round(18 * uiS) : 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)", touchAction: "manipulation", position: "relative" } }, menu ? "\u2715" : "\u2630", hasRec && !menu && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#4c6", animation: "recB 1.5s infinite" } })), menu === "open" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: isDesk ? 5 : 3, animation: "fadeUp .15s" } }, [["stats", "\u{1F4CA} Stats"], ["inv", "\u{1F392} Inventory"], ["obj", "\u{1F4DC} Quests"], ["log", "\u{1F4CB} Event Log"], ["settings", "\u2699\uFE0F Settings"]].map(([k, lb]) => /* @__PURE__ */ React.createElement("button", { key: k, onClick: () => setMenu(k), style: { padding: isDesk ? `${Math.round(10 * uiS)}px ${Math.round(16 * uiS)}px` : "8px 14px", borderRadius: 8, background: "rgba(14,14,22,.8)", border: "1px solid #2a2a3a", color: "#aaa", fontSize: isDesk ? Math.round(12 * uiS) : 11, cursor: "pointer", backdropFilter: "blur(6px)", textAlign: "left", fontFamily: "'JetBrains Mono',monospace", touchAction: "manipulation", whiteSpace: "nowrap" } }, lb)))), settings.minimap && !menu && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? Math.round(56 * uiS) : 54, right: isDesk ? 16 : 6, width: MW * mmS + 2, height: MH * mmS + 2, background: "rgba(6,6,12,.55)", border: `1px solid ${fc.wall}33`, borderRadius: 4, overflow: "hidden", zIndex: 8 } }, miniDots), inSanc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(30,60,80,.35)", border: "1px solid #48a3", borderRadius: 8, fontSize: 9, color: "#6bd", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F3D5}\uFE0F SANCTUARY"), !inSanc && bossAlive && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 10px", background: "rgba(160,20,50,.25)", border: "1px solid #8233", borderRadius: 8, fontSize: 9, color: "#d46", zIndex: 10, backdropFilter: "blur(4px)" } }, player.floor % 10 === 0 ? "\u{1F451} MEGA BOSS" : "\u{1F479} BOSS"), /* @__PURE__ */ React.createElement("div", { ref: logRef, className: "scr", style: { position: "absolute", bottom: isDesk ? 16 : 140, left: isDesk ? 16 : 6, maxWidth: isDesk ? Math.round(280 * uiS) : 180, maxHeight: isDesk ? Math.round(50 * uiS) : 32, overflowY: "auto", zIndex: 8, pointerEvents: "none" } }, eLog.slice(isDesk ? -5 : -3).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: isDesk ? Math.round(10 * uiS) : 7, color: logCol(e.ty), opacity: i === Math.min(eLog.length - 1, isDesk ? 4 : 2) ? 1 : 0.4, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 4px #000" } }, e.m))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: isDesk ? Math.round(68 * uiS) : 174, left: isDesk ? 16 : 6, fontSize: isDesk ? Math.round(9 * uiS) : 7, color: "#444", zIndex: 7, pointerEvents: "none", textShadow: "0 1px 3px #000" } }, inSanc ? "Sanctuary" : fc.name), !isDesk && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, right: 6, zIndex: 15 } }, /* @__PURE__ */ React.createElement(DPad, { accent: fc.accent, onDir: move, combatActive: !!combat || !!shop })), menu && menu !== "open" && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)" }, onClick: () => setMenu(null) }, /* @__PURE__ */ React.createElement("div", { className: "scr", style: { width: isDesk ? 440 : Math.min(360, winSize.w - 32), maxHeight: isDesk ? "85vh" : "80vh", background: "rgba(12,12,20,.97)", border: `1px solid ${fc.accent}22`, borderRadius: 14, overflowY: "auto", padding: isDesk ? "24px 22px" : "18px 14px", animation: "fadeUp .2s ease", boxShadow: `0 8px 40px rgba(0,0,0,.6), 0 0 20px ${fc.accent}08` }, onClick: (e) => e.stopPropagation() }, menu === "stats" && (() => {
+  return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000", position: "relative", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, bottom: 0, left: "env(safe-area-inset-left,0px)", right: "env(safe-area-inset-right,0px)", overflow: "hidden", background: fc.bg, color: "#c8c8d0", fontFamily: "'JetBrains Mono',monospace" } }, /* @__PURE__ */ React.createElement("style", null, CSS, `:root{--ac:${fc.accent};}`), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", animation: shaking ? "shake .2s" : inSanc ? "sancP 4s infinite" : "none" } }, /* @__PURE__ */ React.createElement("table", { style: { borderCollapse: "collapse" } }, /* @__PURE__ */ React.createElement("tbody", null, mapRows))), vfx.flash && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none", animation: "dmgFlash .3s forwards", background: vfx.flash === "damage" ? "rgba(255,40,40,.15)" : vfx.flash === "heal" ? "rgba(40,255,100,.12)" : "rgba(255,200,40,.12)" } }), vfx.particles.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 4, pointerEvents: "none" } }, vfx.particles.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { position: "absolute", width: 6, height: 6, borderRadius: "50%", background: p.color, boxShadow: `0 0 4px ${p.color}`, animation: `particle ${p.dur}s ease-out forwards`, "--px": `${p.px}px`, "--py": `${p.py}px` } }))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, left: isDesk ? 16 : 6, zIndex: 10, display: "flex", flexDirection: "column", gap: isDesk ? Math.round(5 * uiS) : 3, width: isDesk ? Math.round(180 * uiS) : 160, pointerEvents: "none" } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.hp, max: player.maxHp, color: "#c33", label: "HP", h: isDesk ? Math.round(12 * uiS) : 8 }), /* @__PURE__ */ React.createElement(Bar, { cur: player.mp, max: player.maxMp, color: "#36c", label: "MP", h: isDesk ? Math.round(12 * uiS) : 8 }), /* @__PURE__ */ React.createElement(Bar, { cur: player.xp, max: xpFor(player.level), color: "#74a", label: "XP", h: isDesk ? Math.round(10 * uiS) : 6 }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: isDesk ? Math.round(10 * uiS) : 8, color: "#888", paddingTop: 1 } }, /* @__PURE__ */ React.createElement("span", null, fc.icon, " F", player.floor, " Lv", player.level), /* @__PURE__ */ React.createElement("span", null, "\u{1F441}", player.vr + player.torchB, "/", player.vr + 3, " \u{1F4B0}", player.gold))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, right: isDesk ? 16 : 6, zIndex: 20, display: "flex", flexDirection: "column", gap: isDesk ? 6 : 4, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMenu((m) => m ? null : "open"), style: { width: isDesk ? Math.round(40 * uiS) : 42, height: isDesk ? Math.round(40 * uiS) : 42, borderRadius: 10, background: "rgba(14,14,22,.65)", border: `1px solid ${fc.accent}33`, color: menu ? fc.accent : "#888", fontSize: isDesk ? Math.round(18 * uiS) : 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)", touchAction: "manipulation", position: "relative" } }, menu ? "\u2715" : "\u2630", hasRec && !menu && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#4c6", animation: "recB 1.5s infinite" } })), menu === "open" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: isDesk ? 5 : 3, animation: "fadeUp .15s" } }, [["stats", "\u{1F4CA} Stats"], ["inv", "\u{1F392} Inventory"], ["armory", "\u{1F3DB}\uFE0F Armory"], ["obj", "\u{1F4DC} Quests"], ["log", "\u{1F4CB} Event Log"], ["settings", "\u2699\uFE0F Settings"]].map(([k, lb]) => /* @__PURE__ */ React.createElement("button", { key: k, onClick: () => setMenu(k), style: { padding: isDesk ? `${Math.round(10 * uiS)}px ${Math.round(16 * uiS)}px` : "8px 14px", borderRadius: 8, background: "rgba(14,14,22,.8)", border: "1px solid #2a2a3a", color: "#aaa", fontSize: isDesk ? Math.round(12 * uiS) : 11, cursor: "pointer", backdropFilter: "blur(6px)", textAlign: "left", fontFamily: "'JetBrains Mono',monospace", touchAction: "manipulation", whiteSpace: "nowrap" } }, lb)))), settings.minimap && !menu && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? Math.round(56 * uiS) : 54, right: isDesk ? 16 : 6, width: MW * mmS + 2, height: MH * mmS + 2, background: "rgba(6,6,12,.55)", border: `1px solid ${fc.wall}33`, borderRadius: 4, overflow: "hidden", zIndex: 8 } }, miniDots), inSanc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(30,60,80,.35)", border: "1px solid #48a3", borderRadius: 8, fontSize: 9, color: "#6bd", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F3D5}\uFE0F SANCTUARY"), subArea && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(80,30,80,.35)", border: "1px solid #d4f3", borderRadius: 8, fontSize: 9, color: "#d8f", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F52E} HIDDEN AREA", dun?.hasMini ? " \xB7 \u26A0\uFE0F Mini-Boss" : ""), !inSanc && !subArea && bossAlive && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 10px", background: "rgba(160,20,50,.25)", border: "1px solid #8233", borderRadius: 8, fontSize: 9, color: "#d46", zIndex: 10, backdropFilter: "blur(4px)" } }, player.floor % 10 === 0 ? "\u{1F451} MEGA BOSS" : "\u{1F479} BOSS"), /* @__PURE__ */ React.createElement("div", { ref: logRef, className: "scr", style: { position: "absolute", bottom: isDesk ? 16 : 140, left: isDesk ? 16 : 6, maxWidth: isDesk ? Math.round(280 * uiS) : 180, maxHeight: isDesk ? Math.round(50 * uiS) : 32, overflowY: "auto", zIndex: 8, pointerEvents: "none" } }, eLog.slice(isDesk ? -5 : -3).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: isDesk ? Math.round(10 * uiS) : 7, color: logCol(e.ty), opacity: i === Math.min(eLog.length - 1, isDesk ? 4 : 2) ? 1 : 0.4, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 4px #000" } }, e.m))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: isDesk ? Math.round(68 * uiS) : 174, left: isDesk ? 16 : 6, fontSize: isDesk ? Math.round(9 * uiS) : 7, color: "#444", zIndex: 7, pointerEvents: "none", textShadow: "0 1px 3px #000" } }, inSanc ? "Sanctuary" : fc.name), !isDesk && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, right: 6, zIndex: 15 } }, /* @__PURE__ */ React.createElement(DPad, { accent: fc.accent, onDir: move, combatActive: !!combat || !!shop })), menu && menu !== "open" && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)" }, onClick: () => setMenu(null) }, /* @__PURE__ */ React.createElement("div", { className: "scr", style: { width: isDesk ? 440 : Math.min(360, winSize.w - 32), maxHeight: isDesk ? "85vh" : "80vh", background: "rgba(12,12,20,.97)", border: `1px solid ${fc.accent}22`, borderRadius: 14, overflowY: "auto", padding: isDesk ? "24px 22px" : "18px 14px", animation: "fadeUp .2s ease", boxShadow: `0 8px 40px rgba(0,0,0,.6), 0 0 20px ${fc.accent}08` }, onClick: (e) => e.stopPropagation() }, menu === "stats" && (() => {
     const eqW = player.equipped.weapon;
     const eqA = player.equipped.armor;
     const pct = Math.round(player.xp / xpFor(player.level) * 100);
@@ -1616,7 +1783,68 @@ function Game() {
         return /* @__PURE__ */ React.createElement("div", { key: o.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", marginBottom: 2, borderRadius: 6, background: ok ? "rgba(68,204,102,.05)" : "transparent" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, width: 20, textAlign: "center" } }, ok ? "\u2705" : "\u2B1C"), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 11, color: ok ? "#4c6" : "#777", textDecoration: ok ? "line-through" : "none" } }, o.text), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: ok ? "#4c6" : "#444" } }, "+", o.xp, "xp"));
       }));
     }));
-  })(), menu === "log" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "EVENT LOG"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, eLog.length, " entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 1 } }, eLog.slice(-60).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 11, color: logCol(e.ty), padding: "3px 6px", borderRadius: 4, background: i % 2 === 0 ? "rgba(20,20,30,.3)" : "transparent", lineHeight: 1.5 } }, e.m))), eLog.length > 60 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 } }, "Showing last 60 entries")), menu === "settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "SETTINGS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, fontSize: 11 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u2694\uFE0F DIFFICULTY"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ["easy", "normal", "hard"].map((d) => /* @__PURE__ */ React.createElement("button", { key: d, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.difficulty === d ? fc.accent + "88" : "#2a2a3a", color: settings.difficulty === d ? fc.accent : "#555", textTransform: "uppercase", background: settings.difficulty === d ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, difficulty: d })) }, d))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, settings.difficulty === "easy" ? "Less XP, forgiving combat" : settings.difficulty === "hard" ? "More XP, brutal combat" : "Balanced experience")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F5A5}\uFE0F DISPLAY"), !isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { color: "#666", fontSize: 10, marginBottom: 6 } }, "Tile Size"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [{ l: "Small", v: 11 }, { l: "Medium", v: 13 }, { l: "Large", v: 15 }].map((s) => /* @__PURE__ */ React.createElement("button", { key: s.l, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.tileSize === s.v ? fc.accent + "88" : "#2a2a3a", color: settings.tileSize === s.v ? fc.accent : "#555", background: settings.tileSize === s.v ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((st) => ({ ...st, tileSize: s.v })) }, s.l)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Minimap"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.minimap ? "#4a66" : "#2a2a3a", color: settings.minimap ? "#4a6" : "#555", background: settings.minimap ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, minimap: !s.minimap })) }, settings.minimap ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Music"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.music ? "#4a66" : "#2a2a3a", color: settings.music ? "#4a6" : "#555", background: settings.music ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, music: !s.music })) }, settings.music ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Sound FX"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.sfx ? "#4a66" : "#2a2a3a", color: settings.sfx ? "#4a6" : "#555", background: settings.sfx ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, sfx: !s.sfx })) }, settings.sfx ? "ON" : "OFF"))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F3AE} CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", lineHeight: 1.8 } }, isDesk ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "WASD / Arrows"), " \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "I"), " \u2014 Open inventory"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Escape"), " \u2014 Close menu / shop"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Enter / Space"), " \u2014 Confirm in combat")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Joystick"), " \u2014 Move (bottom-right)"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "\u2630 Menu"), " \u2014 Stats, inventory, quests")))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F4BE} SAVE DATA \u2014 Slot ", activeSlot), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 8 } }, [1, 2, 3].map((sl) => /* @__PURE__ */ React.createElement("button", { key: sl, style: { ...btnS, flex: 1, padding: "6px 0", textAlign: "center", fontSize: 9, borderColor: activeSlot === sl ? fc.accent + "66" : "#2a2a3a", color: activeSlot === sl ? fc.accent : "#555", background: activeSlot === sl ? "rgba(200,168,67,.06)" : "#111119" }, onClick: () => setActiveSlot(sl) }, "Slot ", sl, save[sl] ? ` \xB7 F${save[sl].player?.floor}` : ""))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", borderColor: "#46c6", color: "#58c", textAlign: "center" }, onClick: () => saveGame() }, "\u{1F4BE} Save"), save[activeSlot] && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", borderColor: "#4a66", color: "#4a6", textAlign: "center" }, onClick: () => loadGame() }, "\u{1F4C2} Load")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, "Auto-saves to active slot on floor change & combat")), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, borderColor: "#c336", color: "#c44", padding: "10px 0", textAlign: "center" }, onClick: () => {
+  })(), menu === "log" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "EVENT LOG"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, eLog.length, " entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 1 } }, eLog.slice(-60).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 11, color: logCol(e.ty), padding: "3px 6px", borderRadius: 4, background: i % 2 === 0 ? "rgba(20,20,30,.3)" : "transparent", lineHeight: 1.5 } }, e.m))), eLog.length > 60 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 } }, "Showing last 60 entries")), menu === "armory" && (() => {
+    const stacks = {};
+    armory.forEach((item) => {
+      const k = item.name;
+      if (!stacks[k]) stacks[k] = { ...item, count: 0, ids: [] };
+      stacks[k].count++;
+      stacks[k].ids.push(item.id);
+    });
+    const weapons = Object.values(stacks).filter((s) => s.type === "weapon").sort((a, b) => (b.atk || 0) - (a.atk || 0));
+    const armors = Object.values(stacks).filter((s) => s.type === "armor").sort((a, b) => (b.def || 0) - (a.def || 0));
+    const totalVal = armory.reduce((s, i) => s + Math.floor((i.val || 0) / 2), 0);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 4, fontFamily: "'Cinzel',serif" } }, "ARMORY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 14 } }, armory.length, " items stored"), armory.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, textAlign: "center", color: "#d4a843", borderColor: "#d4a84344" }, onClick: () => {
+      setArmory([]);
+      setPlayer((p) => ({ ...p, gold: p.gold + totalVal }));
+      log(`Sold all armory items +${totalVal}g`, "info");
+    } }, "Sell All (", totalVal, "g)")), weapons.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c64", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #c6422", paddingBottom: 4 } }, "WEAPONS (", weapons.length, ")"), weapons.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.name, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "#0c0c16", borderRadius: 8, border: "1px solid #1e1e2e", marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, s.icon, " ", s.name), s.count > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "#c64", marginLeft: 5 } }, "\xD7", s.count), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, "+", s.atk, "ATK", s.intB ? ` +${s.intB}INT` : "", s.dexB ? ` +${s.dexB}DEX` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#4a8" }, onClick: () => {
+      const item = armory.find((i) => i.name === s.name);
+      if (item) {
+        setArmory((a) => a.filter((i) => i.id !== item.id));
+        setPlayer((p) => ({ ...p, inv: [...p.inv, item] }));
+        log(`Retrieved ${item.name}`, "info");
+      }
+    } }, "Take"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#d4a843" }, onClick: () => {
+      const item = armory.find((i) => i.name === s.name);
+      if (item) {
+        const v = Math.floor(item.val / 2);
+        setArmory((a) => a.filter((i) => i.id !== item.id));
+        setPlayer((p) => ({ ...p, gold: p.gold + v }));
+        log(`Sold ${item.name} ${v}g`, "info");
+      }
+    } }, "Sell"))))), armors.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#68c", letterSpacing: 2, marginTop: 8, marginBottom: 6, borderBottom: "1px solid #68c2", paddingBottom: 4 } }, "ARMOR (", armors.length, ")"), armors.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.name, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "#0c0c16", borderRadius: 8, border: "1px solid #1e1e2e", marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, s.icon, " ", s.name), s.count > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "#68c", marginLeft: 5 } }, "\xD7", s.count), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, "+", s.def, "DEF", s.mpB ? ` +${s.mpB}MP` : "", s.dexB ? ` +${s.dexB}DEX` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#4a8" }, onClick: () => {
+      const item = armory.find((i) => i.name === s.name);
+      if (item) {
+        setArmory((a) => a.filter((i) => i.id !== item.id));
+        setPlayer((p) => ({ ...p, inv: [...p.inv, item] }));
+        log(`Retrieved ${item.name}`, "info");
+      }
+    } }, "Take"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#d4a843" }, onClick: () => {
+      const item = armory.find((i) => i.name === s.name);
+      if (item) {
+        const v = Math.floor(item.val / 2);
+        setArmory((a) => a.filter((i) => i.id !== item.id));
+        setPlayer((p) => ({ ...p, gold: p.gold + v }));
+        log(`Sold ${item.name} ${v}g`, "info");
+      }
+    } }, "Sell"))))), armory.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#333", textAlign: "center", padding: 20, fontSize: 12 } }, "Armory empty \u2014 old gear goes here when you equip new items"));
+  })(), menu === "settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "SETTINGS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, fontSize: 11 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u2694\uFE0F DIFFICULTY"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ["easy", "normal", "hard"].map((d) => /* @__PURE__ */ React.createElement("button", { key: d, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.difficulty === d ? fc.accent + "88" : "#2a2a3a", color: settings.difficulty === d ? fc.accent : "#555", textTransform: "uppercase", background: settings.difficulty === d ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, difficulty: d })) }, d))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, settings.difficulty === "easy" ? "Less XP, forgiving combat" : settings.difficulty === "hard" ? "More XP, brutal combat" : "Balanced experience")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F5A5}\uFE0F DISPLAY"), !isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { color: "#666", fontSize: 10, marginBottom: 6 } }, "Tile Size"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [{ l: "Small", v: 11 }, { l: "Medium", v: 13 }, { l: "Large", v: 15 }].map((s) => /* @__PURE__ */ React.createElement("button", { key: s.l, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.tileSize === s.v ? fc.accent + "88" : "#2a2a3a", color: settings.tileSize === s.v ? fc.accent : "#555", background: settings.tileSize === s.v ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((st) => ({ ...st, tileSize: s.v })) }, s.l)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Minimap"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.minimap ? "#4a66" : "#2a2a3a", color: settings.minimap ? "#4a6" : "#555", background: settings.minimap ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, minimap: !s.minimap })) }, settings.minimap ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Music"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.music ? "#4a66" : "#2a2a3a", color: settings.music ? "#4a6" : "#555", background: settings.music ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, music: !s.music })) }, settings.music ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Sound FX"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.sfx ? "#4a66" : "#2a2a3a", color: settings.sfx ? "#4a6" : "#555", background: settings.sfx ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, sfx: !s.sfx })) }, settings.sfx ? "ON" : "OFF"))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F3AE} CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", lineHeight: 1.8, marginBottom: isDesk ? 8 : 0 } }, isDesk ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "WASD / Arrows"), " \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Escape"), " \u2014 Close menu / shop"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Enter / Space"), " \u2014 Confirm")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "D-pad"), " \u2014 Move (bottom-right)"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "\u2630 Menu"), " \u2014 Panels"))), isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", letterSpacing: 1, marginBottom: 6 } }, "KEYBINDS (click to change)"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 } }, [["inv", "Inventory"], ["stats", "Stats"], ["quests", "Quests"], ["armory", "Armory"]].map(([k, label]) => /* @__PURE__ */ React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "#111119", borderRadius: 6, border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#666" } }, label), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 10, padding: "2px 10px", color: fc.accent, borderColor: fc.accent + "44", minWidth: 28, textAlign: "center", textTransform: "uppercase" }, onClick: (ev) => {
+    ev.target.textContent = "...";
+    ev.target.style.color = "#fa0";
+    const handler = (e2) => {
+      e2.preventDefault();
+      e2.stopPropagation();
+      const nk = e2.key.toLowerCase();
+      if (nk !== "escape" && nk.length === 1) {
+        setKeybinds((kb) => ({ ...kb, [k]: nk }));
+      }
+      ev.target.textContent = nk !== "escape" && nk.length === 1 ? nk : keybinds[k];
+      ev.target.style.color = fc.accent;
+      window.removeEventListener("keydown", handler, true);
+    };
+    window.addEventListener("keydown", handler, true);
+  } }, keybinds[k])))))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F4BE} SAVE DATA \u2014 Slot ", activeSlot), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 8 } }, [1, 2, 3].map((sl) => /* @__PURE__ */ React.createElement("button", { key: sl, style: { ...btnS, flex: 1, padding: "6px 0", textAlign: "center", fontSize: 9, borderColor: activeSlot === sl ? fc.accent + "66" : "#2a2a3a", color: activeSlot === sl ? fc.accent : "#555", background: activeSlot === sl ? "rgba(200,168,67,.06)" : "#111119" }, onClick: () => setActiveSlot(sl) }, "Slot ", sl, save[sl] ? ` \xB7 F${save[sl].player?.floor}` : ""))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", borderColor: "#46c6", color: "#58c", textAlign: "center" }, onClick: () => saveGame() }, "\u{1F4BE} Save"), save[activeSlot] && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", borderColor: "#4a66", color: "#4a6", textAlign: "center" }, onClick: () => loadGame() }, "\u{1F4C2} Load")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, "Auto-saves to active slot on floor change & combat")), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, borderColor: "#c336", color: "#c44", padding: "10px 0", textAlign: "center" }, onClick: () => {
     setScreen("title");
     setMenu(null);
   } }, "\u{1F6AA} Quit to Title"))), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, width: "100%", marginTop: 14, textAlign: "center" }, onClick: () => setMenu(null) }, "Close"))), shop && (() => {
