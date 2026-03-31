@@ -425,7 +425,19 @@ function genSubArea(f) {
     plc(lri, T.FOUNTAIN);
   } else if (type === 2) {
     hasMini = true;
-    miniPos = { x: rooms[lri].cx, y: rooms[lri].cy };
+    const lr = rooms[lri];
+    let mx = lr.cx, my = lr.cy;
+    if (map[my][mx] !== T.FLOOR) {
+      for (let a = 0; a < 30; a++) {
+        const px = rng(lr.x + 1, lr.x + lr.w - 2), py = rng(lr.y + 1, lr.y + lr.h - 2);
+        if (py >= 0 && py < MH && px >= 0 && px < MW && map[py][px] === T.FLOOR) {
+          mx = px;
+          my = py;
+          break;
+        }
+      }
+    }
+    miniPos = { x: mx, y: my };
     plc(lri, T.CHEST);
     plc(lri, T.CHEST);
   } else {
@@ -1364,6 +1376,7 @@ function Game() {
       return np;
     });
     if (e.isBoss && !e.isBarrier && !e.isMini) setBossAlive(false);
+    if (e.isMini) setDun((d) => ({ ...d, hasMini: false, bossPos: null }));
     setWand((p) => p.filter((w) => w.id !== e.id));
     setStats((p) => ({ ...p, kills: p.kills + 1, totG: p.totG + e.gold, megaK: p.megaK + (e.isMega ? 1 : 0), erebus: p.erebus || e.name === "Erebus" }));
     log(`${e.isBoss ? "\u{1F3C6}" : "\u2694\uFE0F"} ${e.name}! +${xpG}xp +${e.gold}g`, "victory");
@@ -1486,11 +1499,9 @@ function Game() {
     }
     if (tile === T.PORTAL) {
       if (subArea) {
-        const pd = subArea.parentDun;
+        let pd = { ...subArea.parentDun, map: subArea.parentDun.map.map((r) => [...r]) };
         if (subArea.entrancePos) {
-          const nm = pd.map.map((r) => [...r]);
-          nm[subArea.entrancePos.y][subArea.entrancePos.x] = T.FLOOR;
-          pd.map = nm;
+          pd.map[subArea.entrancePos.y][subArea.entrancePos.x] = T.FLOOR;
         }
         setDun(pd);
         setPlayer((p) => ({ ...p, x: subArea.parentPos.x, y: subArea.parentPos.y }));
@@ -1588,15 +1599,18 @@ function Game() {
   }, [cLog]);
   const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   const saveGame = useCallback((slot) => {
+    const sl = slot || activeSlot;
+    const saveDun = subArea ? { ...subArea.parentDun } : { ...dun };
+    const saveWand = subArea ? subArea.parentWand || [] : wand;
+    const savePlayer = subArea ? { ...player, x: subArea.parentPos.x, y: subArea.parentPos.y } : player;
+    const data = { player: savePlayer, dun: saveDun, wand: saveWand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
     if (subArea) {
       setDun(subArea.parentDun);
       setPlayer((p) => ({ ...p, x: subArea.parentPos.x, y: subArea.parentPos.y }));
       setWand(subArea.parentWand || []);
       setSubArea(null);
-      log("Returned from hidden area (auto-save)", "system");
+      log("Returned from hidden area (save)", "system");
     }
-    const sl = slot || activeSlot;
-    const data = { player, dun: { ...subArea ? subArea.parentDun : dun }, wand: subArea ? subArea.parentWand || [] : wand, stats, eLog, bossAlive, inSanc, lastSanc, completedQuests: [...completedQuests], armory, ts: Date.now() };
     setSave((prev) => {
       const ns = [...prev];
       ns[sl] = data;
