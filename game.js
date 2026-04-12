@@ -1,5 +1,5 @@
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
-const T = { WALL: 0, FLOOR: 1, STAIRS: 2, TRAP: 3, CHEST: 4, SECRET: 5, PIT: 6, FIRE: 7, FOUNTAIN: 8, ICE: 10, LAVA: 11, WATER: 12, VOID: 13, SHOP: 14, PORTAL: 15, BARRIER: 16, FEATURE: 17 };
+const T = { WALL: 0, FLOOR: 1, STAIRS: 2, TRAP: 3, CHEST: 4, SECRET: 5, PIT: 6, FIRE: 7, FOUNTAIN: 8, ICE: 10, LAVA: 11, WATER: 12, VOID: 13, SHOP: 14, PORTAL: 15, BARRIER: 16, FEATURE: 17, LORE: 18, NPC: 19, ECHO: 20, LOCKED: 21, CRACKED: 22 };
 const MW = 50, MH = 36, VR = 5;
 const rng = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -135,7 +135,23 @@ function genFloorArmor(f, cls) {
   const def = cls === "warrior" ? 2 + Math.floor(f * 0.5) : cls === "thief" ? 2 + Math.floor(f * 0.35) : 1 + Math.floor(f * 0.22);
   return { id: `fa${f}`, name: `${AP[cls][pi]} ${suf}`, icon, type: "armor", def, mpB: cls === "mage" ? 15 + Math.floor(f * 1.5) : void 0, dexB: cls === "thief" ? 1 + Math.floor(f * 0.18) : void 0, tier: getTier(f), val: 10 + f * 6, lvl: f, floor: f };
 }
-const CONS = [{ id: "c1", name: "HP Potion", icon: "\u2764\uFE0F", type: "consumable", effect: "hp", val: 8, amt: 35, lvl: 1 }, { id: "c2", name: "MP Potion", icon: "\u{1F499}", type: "consumable", effect: "mp", val: 8, amt: 30, lvl: 1 }, { id: "c3", name: "Antidote", icon: "\u{1F49A}", type: "consumable", effect: "cure", val: 5, amt: 0, lvl: 1 }, { id: "c4", name: "Torch", icon: "\u{1F526}", type: "consumable", effect: "vision", val: 4, amt: 1, lvl: 15 }, { id: "c5", name: "Bomb", icon: "\u{1F4A3}", type: "consumable", effect: "damage", val: 14, amt: 50, lvl: 10 }, { id: "c6", name: "Greater HP", icon: "\u2764\uFE0F\u200D\u{1F525}", type: "consumable", effect: "hp", val: 25, amt: 80, lvl: 20 }, { id: "c7", name: "Greater MP", icon: "\u{1F48E}", type: "consumable", effect: "mp", val: 25, amt: 60, lvl: 20 }, { id: "c8", name: "Mega Bomb", icon: "\u{1F9E8}", type: "consumable", effect: "damage", val: 40, amt: 120, lvl: 40 }, { id: "c9", name: "Elixir", icon: "\u2728", type: "consumable", effect: "full", val: 55, amt: 0, lvl: 50 }, { id: "c10", name: "Phoenix Down", icon: "\u{1F525}", type: "consumable", effect: "revive", val: 100, amt: 0, lvl: 70 }];
+const CONS = [
+  { id: "c1", name: "HP Potion", icon: "\u2764\uFE0F", type: "consumable", effect: "hp", val: 8, amt: 35, lvl: 1 },
+  { id: "c2", name: "MP Potion", icon: "\u{1F499}", type: "consumable", effect: "mp", val: 8, amt: 30, lvl: 1 },
+  { id: "c3", name: "Antidote", icon: "\u{1F49A}", type: "consumable", effect: "cure", val: 5, amt: 0, lvl: 1 },
+  { id: "c4", name: "Torch", icon: "\u{1F526}", type: "consumable", effect: "vision", val: 4, amt: 1, lvl: 15 },
+  { id: "c5", name: "Bomb", icon: "\u{1F4A3}", type: "consumable", effect: "damage", val: 14, amt: 50, lvl: 10 },
+  { id: "c6", name: "Greater HP", icon: "\u2764\uFE0F\u200D\u{1F525}", type: "consumable", effect: "hp", val: 25, amt: 80, lvl: 20 },
+  { id: "c7", name: "Greater MP", icon: "\u{1F48E}", type: "consumable", effect: "mp", val: 25, amt: 60, lvl: 20 },
+  { id: "c8", name: "Mega Bomb", icon: "\u{1F9E8}", type: "consumable", effect: "damage", val: 40, amt: 120, lvl: 40 },
+  { id: "c9", name: "Elixir", icon: "\u2728", type: "consumable", effect: "full", val: 55, amt: 0, lvl: 50 },
+  { id: "c10", name: "Phoenix Down", icon: "\u{1F525}", type: "consumable", effect: "revive", val: 100, amt: 0, lvl: 70 },
+  // #7: New consumables
+  { id: "c11", name: "Speed Potion", icon: "\u{1F4A8}", type: "consumable", effect: "speed", val: 12, amt: 3, lvl: 8 },
+  { id: "c12", name: "Shield Scroll", icon: "\u{1F4DC}", type: "consumable", effect: "shield", val: 18, amt: 5, lvl: 15 },
+  { id: "c13", name: "Warp Stone", icon: "\u{1F300}", type: "consumable", effect: "warp", val: 30, amt: 0, lvl: 25 },
+  { id: "c14", name: "Key", icon: "\u{1F511}", type: "consumable", effect: "key", val: 20, amt: 0, lvl: 5 }
+];
 function getChestLoot(f) {
   let p = CONS.filter((c) => c.lvl <= f + 10 && c.lvl >= f - 40);
   if (p.length < 3) p = CONS.filter((c) => c.lvl <= f + 10).slice(-3);
@@ -170,6 +186,10 @@ function genShopStock(floor, cls) {
     items.push({ ...pW, id: uid(), buyPrice: Math.floor(pW.val * 6), cat: "weapon", stock: 1, sold: 0, premium: true });
     items.push({ ...pA, id: uid(), buyPrice: Math.floor(pA.val * 6), cat: "armor", stock: 1, sold: 0, premium: true });
   }
+  const statPotPrice = 100 + floor * 8;
+  items.push({ id: uid(), name: "STR Tonic", icon: "\u{1F4AA}", type: "consumable", effect: "perm_str", buyPrice: statPotPrice, cat: "consumable", stock: 1, sold: 0 });
+  items.push({ id: uid(), name: "DEX Tonic", icon: "\u{1F3C3}", type: "consumable", effect: "perm_dex", buyPrice: statPotPrice, cat: "consumable", stock: 1, sold: 0 });
+  items.push({ id: uid(), name: "INT Tonic", icon: "\u{1F9E0}", type: "consumable", effect: "perm_int", buyPrice: statPotPrice, cat: "consumable", stock: 1, sold: 0 });
   return { items, name: SHOP_NAMES[tier - 1] || "Merchant", icon: ["\u{1F9D9}", "\u{1F9DD}", "\u26CF\uFE0F", "\u{1F47B}", "\u{1F608}", "\u{1F9CA}", "\u{1F300}", "\u{1F432}", "\u{1F441}\uFE0F", "\u{1F451}"][tier - 1] || "\u{1F9D9}", tier };
 }
 const TIER_ELEM = ["physical", "poison", "earth", "dark", "fire", "ice", "void", "fire", "dark", "dark"];
@@ -231,6 +251,13 @@ const BIOME_FEATURE = [
   { icon: "\u{1F311}", name: "Shadow Pool", eff: "mp_full" }
 ];
 const CORR_HAZ = [["\u{1F578}\uFE0F", "web"], ["\u{1F33F}", "roots"], ["\u{1FAA8}", "rocks"], ["\xB7", ""], ["\u{1F525}", "flames"], ["\u{1F9CA}", "ice"], ["\xB7", ""], ["\u{1F9B4}", "bones"], ["\xB7", ""], ["\xB7", ""]];
+const ROOM_THEMES = ["armory", "library", "shrine", "prison", "treasury", "lab", "crypt", "garden"];
+const LANDMARKS = [
+  { icon: "\u{1F5FF}", name: "Ancient Statue", eff: "def", amt: 1, msg: "+1 DEF. The stone acknowledges you." },
+  { icon: "\u26E9\uFE0F", name: "Shrine", eff: "hp", amt: 0, msg: "Fully healed. The gods remember." },
+  { icon: "\u{1F3DB}\uFE0F", name: "Altar", eff: "xp", amt: 0, msg: "Wisdom flows through you." },
+  { icon: "\u{1FA91}", name: "Throne", eff: "str", amt: 1, msg: "+1 STR. Power recognizes power." }
+];
 const MB = [
   [{ n: "Rat", i: "\u{1F400}", h: 16, a: 5, d: 1, x: 8, g: 3 }, { n: "Bat", i: "\u{1F987}", h: 12, a: 6, d: 0, x: 6, g: 2 }, { n: "Skeleton", i: "\u{1F480}", h: 26, a: 9, d: 4, x: 15, g: 7 }, { n: "Zombie", i: "\u{1F9DF}", h: 32, a: 8, d: 5, x: 16, g: 6 }, { n: "Ghost", i: "\u{1F47B}", h: 20, a: 12, d: 2, x: 18, g: 9 }],
   [{ n: "Slime", i: "\u{1F7E2}", h: 24, a: 8, d: 3, x: 10, g: 4 }, { n: "Spider", i: "\u{1F577}\uFE0F", h: 18, a: 11, d: 2, x: 11, g: 5 }, { n: "Croc", i: "\u{1F40A}", h: 38, a: 14, d: 6, x: 20, g: 10 }, { n: "Sewer Hag", i: "\u{1F9D9}", h: 28, a: 16, d: 3, x: 24, g: 13 }, { n: "Hydra", i: "\u{1F40D}", h: 48, a: 18, d: 7, x: 32, g: 16 }],
@@ -307,7 +334,73 @@ const BOSS_EPITAPH = {
 const TIER_INTROS = ["The air smells of old stone and older death.", "Water drips from above. It doesn't smell right.", "Pickaxes lie broken. The mountain won.", "Hymns echo from nowhere. The dead still pray.", "Heat rises through the floor. Something is still burning.", "Your breath crystallizes. Time stopped here.", "The corridors don't connect the way they should.", "Claw marks on the walls. These weren't always tunnels.", "You can't tell if you're awake.", "This deep didn't exist before him."];
 const SANC_PLAQUES = ["The Hollow Kingdom endured for three hundred years.", "The water once ran clear to the surface.", "Ten thousand miners worked these halls.", "The cathedral held the largest library in the known world.", "Master Smith Ignatius forged the Crown of Dawn here.", "The ice gardens were said to be the most beautiful place underground.", "The research labs were sealed by royal decree. Someone unsealed them.", "Queen Tiamat loved her people. That was the problem.", "The forbidden archive held one rule: never read aloud."];
 const SANC_NPC = ["You survived the crypts. Most don't.", "Toxicor's poison will fade now. The water won't heal, but it'll stop killing.", "The mines go deeper than anyone mapped. Be careful.", "Malachar's undead don't rest. Even here, I hear them.", "The forge fires are out. But the embers remember.", "Everything frozen down there was alive once. Remember that.", "The void researchers thought they were studying it. It was studying them.", "The drakes mourn their queen. They'll fight harder now.", "Don't trust what you see below. Azathoth's dreams are contagious."];
-const CLASSES = { warrior: { name: "Warrior", icon: "\u2694\uFE0F", hp: 130, mp: 25, str: 15, dex: 8, int: 5, def: 13, desc: "Heavy armor. Devastating strikes.", skills: ["Power Strike", "Shield Wall", "Cleave", "War Cry", "Berserk"] }, mage: { name: "Mage", icon: "\u{1F52E}", hp: 65, mp: 110, str: 4, dex: 6, int: 17, def: 4, desc: "Master of arcane destruction.", skills: ["Fireball", "Ice Shard", "Arcane Shield", "Chain Bolt", "Meteor"] }, thief: { name: "Thief", icon: "\u{1F5E1}\uFE0F", hp: 85, mp: 55, str: 9, dex: 17, int: 8, def: 6, desc: "Swift. Cunning. Lethal.", skills: ["Backstab", "Smoke Bomb", "Steal", "Assassinate", "Shadow Step"] } };
+const LORE_ENTRIES = [
+  ["An expedition journal: 'Day 1. The entrance is clear. Erebus leads us deeper.'", "Scratched into the wall: 'The rats weren't always this big.'", "A faded map. Someone marked this room 'SAFE.' The ink is brown."],
+  ["Engineer's log: 'Toxicor reversed the water flow. Nothing drains anymore.'", "A child's toy, preserved in sludge. Someone lived here.", "Carved into pipe: 'The mushrooms glow because they feed on the sick.'"],
+  ["A miner's last entry: 'The deeper ores listen. I swear they listen.'", "Luminite sample, still warm. It hums when you hold it.", "Foreman's log: 'Gorath was a statue. Then it wasn't.'"],
+  ["Prayer book, pages stuck with blood: 'Malachar promised us eternity.'", "A preserved body. It's smiling. The preservation is perfect.", "Cathedral record: 'The hymns continue without singers.'"],
+  ["Blacksmith's journal: 'Ignatius stopped sleeping. Says the metal speaks.'", "A half-forged crown, still glowing. The craftsmanship is flawless.", "Warning etched in steel: 'He didn't start the fire. He BECAME it.'"],
+  ["Research note: 'Glacius froze time itself. The garden is proof.'", "An ice flower, impossibly delicate. It hasn't melted in decades.", "Personal letter, never sent: 'I can see my breath. It's been three years.'"],
+  ["Lab journal: 'Experiment 7. The void looked back.'", "A mirror that shows yesterday. Or tomorrow. Hard to tell.", "Warning sign: 'REALITY UNSTABLE BEYOND THIS POINT'"],
+  ["Drake keeper's log: 'Tiamat changed them to save them. They don't remember being human.'", "A scale the size of a shield. It's warm and smells of cinnamon.", "Lullaby carved in Draconic. The translation is heartbreaking."],
+  ["Researcher's final note: 'Azathoth isn't sleeping. It's DREAMING us.'", "A clock running backward. The hands move when you're not looking.", "Someone's journal \u2014 your handwriting. You don't remember writing it."],
+  ["Erebus' diary: 'The Heart promised it would stop the pain.'", "A throne room sketch. Erebus drew himself small. The Heart, enormous.", "Final page: 'I didn't want to be king. I wanted to go home.'"]
+];
+const NPC_DATA = [
+  [{ icon: "\u{1F464}", name: "Survivor", line: "Turn back. There's nothing down here worth finding." }],
+  [{ icon: "\u{1F527}", name: "Engineer", line: "Toxicor reversed the water. Everything flows wrong now." }],
+  [{ icon: "\u{1F47B}", name: "Ghost Miner", line: "The deeper ores listen. Don't tap the walls." }],
+  [{ icon: "\u{1F4D6}", name: "Undead Scribe", line: "Malachar says he's preserving knowledge. He's preserving US." }],
+  [{ icon: "\u{1F467}", name: "Ignatius' Daughter", line: "Please. End my father's suffering. He's still in there." }],
+  [{ icon: "\u{1F9CA}", name: "Frozen Scholar", line: "I've been here... how long? The ice won't let me count." }],
+  [{ icon: "\u{1F4DC}", name: "Your Journal", line: "'If you're reading this, you've gone too deep. Come back.' \u2014 You" }],
+  [{ icon: "\u{1F409}", name: "Dying Drake", line: "She did it for us... we were human once... remember..." }],
+  [{ icon: "\u{1F52C}", name: "Looping Researcher", line: "Day 1. The experiment begins. Day 1. The experiment begins. Day 1." }],
+  [{ icon: "\u{1F441}\uFE0F", name: "Erebus' Memory", line: "I was so afraid. I'm still afraid. Are you afraid too?" }]
+];
+const ECHO_LINES = ["I was afraid.", "The Heart promised it would stop.", "I didn't want to be alone.", "Do you hear it too?", "I can still remember sunlight.", "They trusted me.", "It wasn't supposed to be like this.", "I'm sorry.", "You remind me of someone I was."];
+const BESTIARY_FLAVOR = { Rat: "Once pets of the court. Now they feast on their former masters.", Bat: "They fled the surface when the darkness began.", Skeleton: "The kingdom's soldiers, still marching.", Zombie: "They remember nothing. That's the mercy.", Ghost: "Trapped between the world they knew and the one that replaced it.", Slime: "The sewers' immune system, attacking everything foreign.", Spider: "They grew large on a diet of despair.", Kobold: "Miners who dug too greedily and too deep.", Golem: "Built to protect. Forgot who from.", Wraith: "Scholars who read the forbidden texts aloud.", Shadow: "What's left when a void walker loses their mind.", Imp: "Drawn to the fire like moths. Unlike moths, they survived.", "Ice Wraith": "Frozen mid-scream. The cold preserved everything except hope.", Dragonkin: "Tiamat's children. They don't know they were human.", Gibberer: "It saw something in the void. Now it can't stop talking about it.", "Shd Guard": "Erebus' personal guard. They chose this.", Fallen: "Angels that descended to help. The darkness was stronger." };
+const CLASSES = { warrior: { name: "Warrior", icon: "\u2694\uFE0F", hp: 130, mp: 25, str: 15, dex: 8, int: 5, def: 13, desc: "Heavy armor. Devastating strikes.", skills: ["Power Strike", "Shield Wall", "Cleave", "War Cry", "Berserk"], passive: "Iron Will: +10% HP from armor" }, mage: { name: "Mage", icon: "\u{1F52E}", hp: 65, mp: 110, str: 4, dex: 6, int: 17, def: 4, desc: "Master of arcane destruction.", skills: ["Fireball", "Ice Shard", "Arcane Shield", "Chain Bolt", "Meteor"], passive: "Arcane Surge: +15% spell damage" }, thief: { name: "Thief", icon: "\u{1F5E1}\uFE0F", hp: 85, mp: 55, str: 9, dex: 17, int: 8, def: 6, desc: "Swift. Cunning. Lethal.", skills: ["Backstab", "Smoke Bomb", "Steal", "Assassinate", "Shadow Step"], passive: "Shadow Step: +20% dodge chance" } };
+const PERKS = [
+  [{ name: "Vitality", desc: "+15% max HP", eff: "hp_pct", amt: 15 }, { name: "Tough Skin", desc: "+3 base DEF", eff: "def", amt: 3 }],
+  [{ name: "Power", desc: "+3 STR", eff: "str", amt: 3 }, { name: "Precision", desc: "+3 DEX", eff: "dex", amt: 3 }],
+  [{ name: "Wisdom", desc: "+3 INT", eff: "int", amt: 3 }, { name: "Endurance", desc: "+20 max MP", eff: "mp", amt: 20 }],
+  [{ name: "Critical Eye", desc: "+5% crit chance", eff: "crit", amt: 5 }, { name: "Gold Sense", desc: "+50% gold drops", eff: "gold", amt: 50 }],
+  [{ name: "Undying", desc: "Survive lethal hit once", eff: "undying", amt: 1 }, { name: "Mastery", desc: "+5 all stats", eff: "allstats", amt: 5 }]
+];
+const MORAL_CHOICES = [
+  { prompt: "A wounded enemy begs for mercy.", a: { label: "Spare", eff: "xp", amt: 20, msg: "Mercy given. +20 XP." }, b: { label: "Strike", eff: "gold", amt: 50, msg: "Cold efficiency. +50 gold." } },
+  { prompt: "A shrine glows with forbidden power.", a: { label: "Pray", eff: "hp", amt: 0, msg: "Fully healed by faith." }, b: { label: "Drain", eff: "str", amt: 2, msg: "+2 STR. The shrine goes dark." } },
+  { prompt: "A child's ghost points to a hidden cache.", a: { label: "Follow", eff: "loot", amt: 0, msg: "Found treasure!" }, b: { label: "Free it", eff: "xp", amt: 40, msg: "The ghost smiles and fades. +40 XP." } },
+  { prompt: "Poisoned water blocks the path.", a: { label: "Drink", eff: "risk", amt: 0, msg: "Survived... barely." }, b: { label: "Go around", eff: "safe", amt: 0, msg: "The longer path. Time well spent." } },
+  { prompt: "An altar demands a blood offering.", a: { label: "Offer", eff: "sacrifice", amt: 0, msg: "Power at a price." }, b: { label: "Refuse", eff: "def", amt: 1, msg: "+1 DEF. Willpower strengthened." } }
+];
+const FLOOR_EVENTS = [
+  { msg: "A cool breeze refreshes you.", eff: "mp", amt: 5 },
+  { msg: "You find a coin glinting in the dust.", eff: "gold", amt: 15 },
+  { msg: "A rat scurries past, dropping something.", eff: "loot", amt: 0 },
+  { msg: "Strange runes glow briefly on the wall.", eff: "xp", amt: 10 },
+  { msg: "You step on a pressure plate \u2014 nothing happens. Lucky.", eff: "none", amt: 0 },
+  { msg: "An echo of laughter fades into silence.", eff: "none", amt: 0 },
+  { msg: "A warm draft carries the scent of cinnamon.", eff: "hp", amt: 8 },
+  { msg: "The ground trembles slightly.", eff: "none", amt: 0 }
+];
+const SPECIALIZATIONS = {
+  warrior: [{ name: "Berserker", desc: "+20% ATK, -10% DEF", eff: "berserker" }, { name: "Guardian", desc: "+20% DEF, +50 HP", eff: "guardian" }],
+  mage: [{ name: "Elementalist", desc: "+25% spell damage", eff: "elementalist" }, { name: "Arcanist", desc: "+40 MP, spells cost 15% less", eff: "arcanist" }],
+  thief: [{ name: "Assassin", desc: "+30% crit damage", eff: "assassin" }, { name: "Shadow", desc: "+25% dodge, +3 vision", eff: "shadow" }]
+};
+const ACHIEVEMENTS = [
+  { id: "a1", name: "First Blood", desc: "Defeat your first enemy", c: (s) => s.kills >= 1 },
+  { id: "a2", name: "Dungeon Diver", desc: "Reach Floor 25", c: (s) => s.floor >= 25 },
+  { id: "a3", name: "Centurion", desc: "Defeat 100 enemies", c: (s) => s.kills >= 100 },
+  { id: "a4", name: "Dragon Slayer", desc: "Beat Tiamat", c: (s) => s.megaK >= 8 },
+  { id: "a5", name: "Shadow Breaker", desc: "Defeat Erebus", c: (s) => s.erebus },
+  { id: "a6", name: "Treasure Hunter", desc: "Open 50 chests", c: (s) => s.chests >= 50 },
+  { id: "a7", name: "Millionaire", desc: "Earn 100,000 gold total", c: (s) => s.totG >= 1e5 },
+  { id: "a8", name: "Marathon", desc: "Walk 5,000 steps", c: (s) => s.steps >= 5e3 }
+];
+const BOUNTY_TARGETS = ["Rat", "Spider", "Kobold", "Golem", "Wraith", "Imp", "Ice Wraith", "Shadow", "Dragonkin", "Gibberer"];
 const OBJ = [
   // Early game
   { id: 1, text: "Reach Floor 5", c: (s) => s.floor >= 5, cat: "explore", xp: 20 },
@@ -367,6 +460,14 @@ function calcStats(p) {
     if (p.equipped.armor.mpB) mp += p.equipped.armor.mpB;
     if (p.equipped.armor.dexB) def += Math.floor(p.equipped.armor.dexB * 0.5);
   }
+  if (p.equipped.accessory) {
+    const acc = p.equipped.accessory;
+    if (acc.atkB) atk += acc.atkB;
+    if (acc.defB) def += acc.defB;
+    if (acc.mpB) mp += acc.mpB;
+  }
+  if (p.cls === "warrior") def = Math.floor(def * 1.1);
+  if (p.cls === "mage") atk = Math.floor(atk * 1.15);
   return { atk, def, maxMp: mp };
 }
 function rollDmg(base, variance) {
@@ -451,6 +552,128 @@ function genDungeon(f, isSanc = false) {
       if (map[y1][x1] === T.WALL) map[y1][x1] = T.FLOOR;
     }
   }
+  const decor = /* @__PURE__ */ new Map();
+  if (!isSanc) {
+    rooms.forEach((r, ri) => {
+      if (ri === 0 || ri === rooms.length - 1 || Math.random() > 0.2) return;
+      const ext = rng(2, 3);
+      const side = rng(0, 3);
+      let sx, sy, sw, sh;
+      if (side === 0) {
+        sx = r.x + r.w;
+        sy = r.y;
+        sw = ext;
+        sh = Math.floor(r.h / 2);
+      } else if (side === 1) {
+        sx = r.x - ext;
+        sy = r.y + Math.floor(r.h / 2);
+        sw = ext;
+        sh = Math.floor(r.h / 2);
+      } else if (side === 2) {
+        sx = r.x;
+        sy = r.y + r.h;
+        sw = Math.floor(r.w / 2);
+        sh = ext;
+      } else {
+        sx = r.x + Math.floor(r.w / 2);
+        sy = r.y - ext;
+        sw = Math.floor(r.w / 2);
+        sh = ext;
+      }
+      for (let y = sy; y < sy + sh; y++) for (let x = sx; x < sx + sw; x++) {
+        if (x > 0 && x < MW - 1 && y > 0 && y < MH - 1) map[y][x] = T.FLOOR;
+      }
+    });
+    rooms.forEach((r, ri) => {
+      if (ri === 0 || ri === rooms.length - 1) return;
+      if (r.w >= 8 && r.h >= 6) {
+        for (let py = r.y + 2; py < r.y + r.h - 2; py += 3) for (let px = r.x + 2; px < r.x + r.w - 2; px += 3) {
+          if (map[py] && map[py][px] === T.FLOOR && Math.random() < 0.6) {
+            const adjF = [[0, -1], [0, 1], [-1, 0], [1, 0]].filter(([dx, dy]) => map[py + dy] && map[py + dy][px + dx] === T.FLOOR).length;
+            if (adjF <= 2) {
+              const horiz = map[py] && map[py][px - 1] === T.FLOOR && map[py][px + 1] === T.FLOOR;
+              const vert = map[py - 1] && map[py - 1][px] === T.FLOOR && map[py + 1] && map[py + 1][px] === T.FLOOR;
+              if (horiz || vert) continue;
+            }
+            map[py][px] = T.WALL;
+            decor.set(`${px},${py}`, { icon: "\u{1FAA8}", type: "pillar" });
+          }
+        }
+      }
+    });
+    const crackCandidates = [];
+    for (let y = 2; y < MH - 2; y++) for (let x = 2; x < MW - 2; x++) {
+      if (map[y][x] !== T.WALL) continue;
+      const adjFloor = [[0, -1], [0, 1], [-1, 0], [1, 0]].filter(([dx, dy]) => map[y + dy] && map[y + dy][x + dx] === T.FLOOR).length;
+      if (adjFloor >= 1 && adjFloor <= 2) crackCandidates.push({ x, y });
+    }
+    const crackCount = Math.min(crackCandidates.length, rng(3, 6));
+    for (let i = 0; i < crackCount && crackCandidates.length > 0; i++) {
+      const idx = rng(0, crackCandidates.length - 1);
+      map[crackCandidates[idx].y][crackCandidates[idx].x] = T.CRACKED;
+      crackCandidates.splice(idx, 1);
+    }
+    const themeCount = rng(2, Math.min(4, rooms.length - 2));
+    for (let i = 0; i < themeCount; i++) {
+      const ri2 = rng(1, Math.max(1, rooms.length - 2));
+      const r = rooms[ri2];
+      if (!r) continue;
+      const theme = ROOM_THEMES[rng(0, ROOM_THEMES.length - 1)];
+      const themeIcons = { armory: "\u2694\uFE0F", library: "\u{1F4DA}", shrine: "\u26E9\uFE0F", prison: "\u26D3\uFE0F", treasury: "\u{1F4B0}", lab: "\u{1F9EA}", crypt: "\u26B0\uFE0F", garden: "\u{1F33F}" };
+      const icon = themeIcons[theme] || "\u{1F3DB}\uFE0F";
+      for (let td = 0; td < rng(1, 2); td++) {
+        for (let a = 0; a < 15; a++) {
+          const px = rng(r.x + 1, r.x + r.w - 2), py = rng(r.y + 1, r.y + r.h - 2);
+          if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+            decor.set(`${px},${py}`, { icon, type: "theme", theme });
+            break;
+          }
+        }
+      }
+    }
+    const lmCount = rng(1, 2);
+    for (let i = 0; i < lmCount; i++) {
+      const lm = LANDMARKS[rng(0, LANDMARKS.length - 1)];
+      const ri3 = rng(1, Math.max(1, rooms.length - 2));
+      const r = rooms[ri3];
+      if (!r) continue;
+      for (let a = 0; a < 20; a++) {
+        const px = rng(r.x + 1, r.x + r.w - 2), py = rng(r.y + 1, r.y + r.h - 2);
+        if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+          map[py][px] = T.FEATURE;
+          decor.set(`${px},${py}`, { icon: lm.icon, name: lm.name, eff: lm.eff, amt: lm.amt, msg: lm.msg, type: "feature" });
+          break;
+        }
+      }
+    }
+    if (f % 5 === 0 && f % 10 !== 0 && rooms.length > 3) {
+      const switchRoom = rng(1, Math.max(1, rooms.length - 3));
+      const sr = rooms[switchRoom];
+      const rewardRoom = rng(switchRoom + 1, Math.max(switchRoom + 1, rooms.length - 2));
+      const rr = rooms[rewardRoom];
+      if (sr && rr) {
+        for (let a = 0; a < 20; a++) {
+          const px = rng(sr.x + 1, sr.x + sr.w - 2), py = rng(sr.y + 1, sr.y + sr.h - 2);
+          if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+            let targetX = -1, targetY = -1;
+            for (let b = 0; b < 30; b++) {
+              const tx = rng(rr.x, rr.x + rr.w - 1), ty = rng(rr.y, rr.y + rr.h - 1);
+              if (map[ty] && map[ty][tx] === T.WALL) {
+                targetX = tx;
+                targetY = ty;
+                break;
+              }
+            }
+            if (targetX >= 0) {
+              map[py][px] = T.FEATURE;
+              decor.set(`${px},${py}`, { icon: "\u{1F518}", name: "Ancient Switch", eff: "puzzle", type: "feature", targetX, targetY });
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
   const plc = (ri, t) => {
     const r = rooms[ri];
     if (!r) return null;
@@ -520,7 +743,6 @@ function genDungeon(f, isSanc = false) {
   }
   const start = { x: rooms[0].cx, y: rooms[0].cy };
   map[start.y][start.x] = T.FLOOR;
-  const decor = /* @__PURE__ */ new Map();
   if (!isSanc) {
     const ti = Math.min(Math.floor((f - 1) / 10), 9);
     const objs = BIOME_OBJ[ti];
@@ -537,6 +759,12 @@ function genDungeon(f, isSanc = false) {
       const idx = rng(0, wallEdges.length - 1);
       const p = wallEdges[idx];
       wallEdges.splice(idx, 1);
+      const adjF2 = [[0, -1], [0, 1], [-1, 0], [1, 0]].filter(([dx, dy]) => map[p.y + dy] && map[p.y + dy][p.x + dx] === T.FLOOR).length;
+      if (adjF2 <= 2) {
+        const hCorr = map[p.y] && map[p.y][p.x - 1] === T.FLOOR && map[p.y][p.x + 1] === T.FLOOR;
+        const vCorr = map[p.y - 1] && map[p.y - 1][p.x] === T.FLOOR && map[p.y + 1] && map[p.y + 1][p.x] === T.FLOOR;
+        if (hCorr || vCorr) continue;
+      }
       map[p.y][p.x] = T.WALL;
       decor.set(`${p.x},${p.y}`, { icon: objs[rng(0, objs.length - 1)], type: "obj" });
     }
@@ -591,6 +819,165 @@ function genDungeon(f, isSanc = false) {
           decor.set(`${tx},${ty}`, { icon: "\u{1F525}", type: "torch" });
         }
       });
+    }
+    if (f >= 5) {
+      const lockCount = rng(0, 2);
+      let placed = 0;
+      for (let y = 2; y < MH - 2 && placed < lockCount; y++) for (let x = 2; x < MW - 2 && placed < lockCount; x++) {
+        if (map[y][x] !== T.FLOOR) continue;
+        const adj = [[0, -1], [0, 1], [-1, 0], [1, 0]].filter(([dx, dy]) => map[y + dy] && (map[y + dy][x + dx] === T.FLOOR || map[y + dy][x + dx] === T.TRAP)).length;
+        if (adj === 2 && Math.random() < 0.02 && !decor.has(`${x},${y}`)) {
+          map[y][x] = T.LOCKED;
+          const q = [{ x: start.x, y: start.y }];
+          const vis = /* @__PURE__ */ new Set();
+          vis.add(start.x + "," + start.y);
+          let reachStairs = !stairsPos;
+          while (q.length > 0) {
+            const p = q.shift();
+            if (stairsPos && p.x === stairsPos.x && p.y === stairsPos.y) {
+              reachStairs = true;
+              break;
+            }
+            for (const [dx2, dy2] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+              const nx2 = p.x + dx2, ny2 = p.y + dy2;
+              const k2 = nx2 + "," + ny2;
+              if (nx2 >= 0 && nx2 < MW && ny2 >= 0 && ny2 < MH && !vis.has(k2) && map[ny2][nx2] !== T.WALL && map[ny2][nx2] !== T.SECRET && map[ny2][nx2] !== T.LOCKED) {
+                vis.add(k2);
+                q.push({ x: nx2, y: ny2 });
+              }
+            }
+          }
+          if (reachStairs) {
+            placed++;
+          } else {
+            map[y][x] = T.FLOOR;
+          }
+        }
+      }
+    }
+    rooms.forEach((r, ri) => {
+      if (ri === 0 || ri === bri) return;
+      let hasItem = false;
+      for (let ry = r.y; ry < r.y + r.h && !hasItem; ry++) for (let rx = r.x; rx < r.x + r.w && !hasItem; rx++) {
+        const t = map[ry] && map[ry][rx];
+        if (t === T.CHEST || t === T.FOUNTAIN || t === T.FEATURE || t === T.LORE || t === T.NPC || t === T.SHOP) hasItem = true;
+      }
+      if (!hasItem && Math.random() < 0.3) {
+        const cx = rng(r.x + 1, r.x + r.w - 2), cy = rng(r.y + 1, r.y + r.h - 2);
+        if (map[cy] && map[cy][cx] === T.FLOOR) decor.set(`${cx},${cy}`, { type: "cache", gold: rng(5 + f, 15 + f * 3) });
+      }
+    });
+    if (Math.random() < 0.1) {
+      const mri = rng(1, Math.max(1, rooms.length - 2));
+      const mr = rooms[mri];
+      if (mr) {
+        for (let a = 0; a < 20; a++) {
+          const px = rng(mr.x + 1, mr.x + mr.w - 2), py = rng(mr.y + 1, mr.y + mr.h - 2);
+          if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+            map[py][px] = T.SHOP;
+            break;
+          }
+        }
+      }
+    }
+    const loreCount = rng(2, 3);
+    const loreEntries = LORE_ENTRIES[ti] || [];
+    for (let li = 0; li < loreCount && li < loreEntries.length; li++) {
+      const ri2 = rng(1, Math.max(1, rooms.length - 2));
+      const r2 = rooms[ri2];
+      if (!r2) continue;
+      for (let a = 0; a < 20; a++) {
+        const px = rng(r2.x + 1, r2.x + r2.w - 2), py = rng(r2.y + 1, r2.y + r2.h - 2);
+        if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+          map[py][px] = T.LORE;
+          decor.set(`${px},${py}`, { type: "lore", text: loreEntries[li], tier: ti + 1, idx: li });
+          break;
+        }
+      }
+    }
+    const posInTier = (f - 1) % 10;
+    if (NPC_DATA[ti] && (posInTier === 2 || posInTier === 4 || posInTier === 6)) {
+      const npc = NPC_DATA[ti][0];
+      const ri3 = rng(1, Math.max(1, rooms.length - 2));
+      const r3 = rooms[ri3];
+      if (r3) {
+        for (let a = 0; a < 20; a++) {
+          const px = rng(r3.x + 1, r3.x + r3.w - 2), py = rng(r3.y + 1, r3.y + r3.h - 2);
+          if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+            map[py][px] = T.NPC;
+            decor.set(`${px},${py}`, { type: "npc", ...npc });
+            break;
+          }
+        }
+      }
+    }
+    if (f >= 91 && f <= 99 && ECHO_LINES[f - 91]) {
+      const ri4 = rng(1, Math.max(1, rooms.length - 2));
+      const r4 = rooms[ri4];
+      if (r4) {
+        for (let a = 0; a < 20; a++) {
+          const px = rng(r4.x + 1, r4.x + r4.w - 2), py = rng(r4.y + 1, r4.y + r4.h - 2);
+          if (map[py] && map[py][px] === T.FLOOR && !decor.has(`${px},${py}`)) {
+            map[py][px] = T.ECHO;
+            decor.set(`${px},${py}`, { type: "echo", text: ECHO_LINES[f - 91] });
+            break;
+          }
+        }
+      }
+    }
+  }
+  if (stairsPos && !isSanc) {
+    const q = [{ x: start.x, y: start.y }];
+    const vis = /* @__PURE__ */ new Set();
+    vis.add(start.x + "," + start.y);
+    let ok = false;
+    while (q.length > 0) {
+      const p = q.shift();
+      if (p.x === stairsPos.x && p.y === stairsPos.y) {
+        ok = true;
+        break;
+      }
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const nx = p.x + dx, ny = p.y + dy;
+        const k = nx + "," + ny;
+        if (nx >= 0 && nx < MW && ny >= 0 && ny < MH && !vis.has(k) && map[ny][nx] !== T.WALL && map[ny][nx] !== T.SECRET) {
+          vis.add(k);
+          q.push({ x: nx, y: ny });
+        }
+      }
+    }
+    if (!ok) {
+      const toFix = [];
+      for (let y = 1; y < MH - 1; y++) for (let x = 1; x < MW - 1; x++) {
+        if (map[y][x] === T.WALL && decor.has(`${x},${y}`)) {
+          const d2 = decor.get(`${x},${y}`);
+          if (d2.type === "pillar" || d2.type === "obj") toFix.push({ x, y });
+        }
+      }
+      for (const p of toFix) {
+        map[p.y][p.x] = T.FLOOR;
+        decor.delete(`${p.x},${p.y}`);
+        const q2 = [{ x: start.x, y: start.y }];
+        const v2 = /* @__PURE__ */ new Set();
+        v2.add(start.x + "," + start.y);
+        let ok2 = false;
+        while (q2.length > 0) {
+          const p2 = q2.shift();
+          if (p2.x === stairsPos.x && p2.y === stairsPos.y) {
+            ok2 = true;
+            break;
+          }
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nx = p2.x + dx, ny = p2.y + dy;
+            const k = nx + "," + ny;
+            if (nx >= 0 && nx < MW && ny >= 0 && ny < MH && !v2.has(k) && map[ny][nx] !== T.WALL && map[ny][nx] !== T.SECRET) {
+              v2.add(k);
+              q2.push({ x: nx, y: ny });
+            }
+          }
+        }
+        if (ok2) break;
+      }
     }
   }
   return { map, rooms, revealed: rev, start, stairsPos, bossPos, bri, fc, isMega, isSanc, decor };
@@ -769,6 +1156,7 @@ const SFX = (() => {
   try {
     let ctx = null;
     let muted = false;
+    let masterVol = 1;
     const getCtx = () => {
       if (!ctx) try {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -785,7 +1173,7 @@ const SFX = (() => {
         const g = c.createGain();
         o.type = type;
         o.frequency.value = freq;
-        g.gain.value = vol;
+        g.gain.value = vol * masterVol;
         if (decay) g.gain.exponentialRampToValueAtTime(1e-3, c.currentTime + dur);
         o.connect(g);
         g.connect(c.destination);
@@ -801,7 +1189,7 @@ const SFX = (() => {
         if (!c) return;
         const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
         const d = buf.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * vol;
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * vol * masterVol;
         const s = c.createBufferSource();
         const g = c.createGain();
         g.gain.value = 1;
@@ -816,6 +1204,9 @@ const SFX = (() => {
     return {
       setMute: (m) => {
         muted = m;
+      },
+      setVolume: (v) => {
+        masterVol = v;
       },
       step: () => play(80, 0.06, "sine", 0.04),
       hit: () => {
@@ -1070,7 +1461,7 @@ const tR = (tile, fc, vis, inFov, tier) => {
   if (!vis) return { ch: "\xB7", color: "#080808", o: 0.1 };
   const o = inFov ? 1 : 0.25;
   const wc = tier ? BIOME_WALL[Math.min(tier - 1, 9)] : "\u2588";
-  const m = { [T.WALL]: { ch: wc, color: fc.wall }, [T.FLOOR]: { ch: "\xB7", color: fc.floor + "99" }, [T.STAIRS]: { ch: "\u25BC", color: "#0e7", g: "0 0 4px #0e75" }, [T.TRAP]: { ch: "\xB7", color: fc.floor + "99" }, [T.CHEST]: { ch: "\u25C6", color: "#fa0", g: "0 0 4px #fa04" }, [T.SECRET]: { ch: wc, color: fc.wall }, [T.PIT]: { ch: "\u25CB", color: "#500" }, [T.FIRE]: { ch: "\u2248", color: "#f40", g: "0 0 3px #f404" }, [T.FOUNTAIN]: { ch: "\u2666", color: "#48f", g: "0 0 4px #48f4" }, [T.ICE]: { ch: "\u25AA", color: "#8df" }, [T.LAVA]: { ch: "\u2248", color: "#f30", g: "0 0 3px #f304" }, [T.WATER]: { ch: "~", color: "#26a" }, [T.VOID]: { ch: "\u221E", color: "#84c", g: "0 0 3px #84c4" }, [T.SHOP]: { ch: "$", color: "#fa0", g: "0 0 5px #fa06" }, [T.PORTAL]: { ch: "\u2295", color: "#d4f", g: "0 0 6px #d4f6" }, [T.BARRIER]: { ch: "\u2593", color: "#f84", g: "0 0 4px #f844" }, [T.FEATURE]: { ch: "\u2726", color: "#d4a843", g: "0 0 4px #d4a84344" } };
+  const m = { [T.WALL]: { ch: wc, color: fc.wall }, [T.FLOOR]: { ch: "\xB7", color: fc.floor + "99" }, [T.STAIRS]: { ch: "\u25BC", color: "#0e7", g: "0 0 4px #0e75" }, [T.TRAP]: { ch: "\xB7", color: fc.floor + "99" }, [T.CHEST]: { ch: "\u25C6", color: "#fa0", g: "0 0 4px #fa04" }, [T.SECRET]: { ch: wc, color: fc.wall }, [T.PIT]: { ch: "\u25CB", color: "#500" }, [T.FIRE]: { ch: "\u2248", color: "#f40", g: "0 0 3px #f404" }, [T.FOUNTAIN]: { ch: "\u2666", color: "#48f", g: "0 0 4px #48f4" }, [T.ICE]: { ch: "\u25AA", color: "#8df" }, [T.LAVA]: { ch: "\u2248", color: "#f30", g: "0 0 3px #f304" }, [T.WATER]: { ch: "~", color: "#26a" }, [T.VOID]: { ch: "\u221E", color: "#84c", g: "0 0 3px #84c4" }, [T.SHOP]: { ch: "$", color: "#fa0", g: "0 0 5px #fa06" }, [T.PORTAL]: { ch: "\u2295", color: "#d4f", g: "0 0 6px #d4f6" }, [T.BARRIER]: { ch: "\u2593", color: "#f84", g: "0 0 4px #f844" }, [T.FEATURE]: { ch: "\u2726", color: "#d4a843", g: "0 0 4px #d4a84344" }, [T.LORE]: { ch: "\u{1F4DC}", color: "#c9a84c", g: "0 0 4px #c9a84c44" }, [T.NPC]: { ch: "\u{1F9D9}", color: "#8cf", g: "0 0 4px #8cf4" }, [T.ECHO]: { ch: "\u{1F4AC}", color: "#ffd700", g: "0 0 6px #ffd70044" }, [T.LOCKED]: { ch: "\u{1F512}", color: "#fa0", g: "0 0 4px #fa04" }, [T.CRACKED]: { ch: "\u2592", color: "#887755", g: "0 0 2px #88775544" } };
   return { ...m[tile] || { ch: "?", color: "#333" }, o };
 };
 function PlayerChar({ sz, cls, equipped, poisoned, facing, hitReact, bob = true }) {
@@ -1201,7 +1592,7 @@ function Game() {
   const [bossAlive, setBossAlive] = useState(true);
   const [inSanc, setInSanc] = useState(false);
   const [lastSanc, setLastSanc] = useState(0);
-  const [stats, setStats] = useState({ kills: 0, chests: 0, totG: 0, megaK: 0, erebus: false, steps: 0 });
+  const [stats, setStats] = useState({ kills: 0, chests: 0, totG: 0, megaK: 0, erebus: false, steps: 0, seen: {} });
   const [save, setSave] = useState(() => {
     try {
       const slots = [];
@@ -1229,6 +1620,25 @@ function Game() {
     setTimeout(() => setMapHitReact(null), 200);
   }, []);
   const [trail, setTrail] = useState([]);
+  const [loreLog, setLoreLog] = useState([]);
+  const [charName, setCharName] = useState("");
+  const [statPoints, setStatPoints] = useState(0);
+  const [passives, setPassives] = useState([]);
+  const [moralChoice, setMoralChoice] = useState(null);
+  const [specialization, setSpecialization] = useState(null);
+  const [ngPlus, setNgPlus] = useState(0);
+  const [gameTime, setGameTime] = useState(0);
+  const [killStreak, setKillStreak] = useState(0);
+  const [bounty, setBounty] = useState(null);
+  const [achievements, setAchievements] = useState(() => {
+    try {
+      const a = localStorage.getItem("dos_achievements");
+      return a ? JSON.parse(a) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const touchStart = useRef(null);
   const [keybinds, setKeybinds] = useState(() => {
     try {
       const k = localStorage.getItem("dos_keybinds");
@@ -1249,6 +1659,17 @@ function Game() {
     } catch (e) {
     }
   }, [keybinds]);
+  useEffect(() => {
+    if (screen !== "game" || !player) return;
+    const iv = setInterval(() => setGameTime((t) => t + 1), 1e3);
+    return () => clearInterval(iv);
+  }, [screen, player]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("dos_achievements", JSON.stringify(achievements));
+    } catch (e) {
+    }
+  }, [achievements]);
   const [isLand, setIsLand] = useState(() => typeof window !== "undefined" && window.innerWidth > window.innerHeight);
   const [isDesk, setIsDesk] = useState(() => typeof window !== "undefined" && !("ontouchstart" in window) && window.innerWidth >= 1024);
   const [winSize, setWinSize] = useState(() => typeof window !== "undefined" ? { w: window.innerWidth, h: window.innerHeight } : { w: 1024, h: 768 });
@@ -1270,6 +1691,9 @@ function Game() {
     SFX.setMute(!settings.sfx);
   }, [settings.sfx]);
   useEffect(() => {
+    SFX.setVolume(settings.volume || 1);
+  }, [settings.volume]);
+  useEffect(() => {
     const id = "dos-css";
     if (!document.getElementById(id)) {
       const el = document.createElement("style");
@@ -1288,7 +1712,11 @@ function Game() {
     flash("damage");
     SFX.enemyHit();
     setTimeout(() => setShaking(false), 250);
-  }, [flash]);
+    try {
+      if (settings.haptic !== false && navigator.vibrate) navigator.vibrate(50);
+    } catch (e) {
+    }
+  }, [flash, settings.haptic]);
   const handleDeath = useCallback(() => {
     SFX.death();
     if (lastSanc > 0) setScreen("respawn");
@@ -1312,7 +1740,8 @@ function Game() {
     const starterA = genFloorArmor(1, cls);
     starterA.id = "sa0";
     starterA.name = { warrior: "Leather Vest", mage: "Cloth Robes", thief: "Cloth Vest" }[cls];
-    const p = { cls, name: base.name, icon: base.icon, hp: base.hp, maxHp: base.hp, mp: base.mp, maxMp: base.mp, baseMaxMp: base.mp, str: base.str, dex: base.dex, int: base.int, baseDef: base.def, level: 1, xp: 0, floor: 1, gold: 0, x: d.start.x, y: d.start.y, inv: [{ ...CONS[0], id: uid() }, { ...CONS[0], id: uid() }, { ...CONS[1], id: uid() }], equipped: { weapon: starterW, armor: starterA }, skills: base.skills, unlocked: [base.skills[0]], vr: VR, torchB: 0, poisoned: false, warCryB: 0 };
+    const pName = charName.trim() || base.name;
+    const p = { cls, name: pName, icon: base.icon, hp: base.hp, maxHp: base.hp, mp: base.mp, maxMp: base.mp, baseMaxMp: base.mp, str: base.str, dex: base.dex, int: base.int, baseDef: base.def, level: 1, xp: 0, floor: 1, gold: 0, x: d.start.x, y: d.start.y, inv: [{ ...CONS[0], id: uid() }, { ...CONS[0], id: uid() }, { ...CONS[1], id: uid() }], equipped: { weapon: starterW, armor: starterA, accessory: null }, skills: base.skills, unlocked: [base.skills[0]], vr: VR, torchB: 0, poisoned: false, warCryB: 0 };
     d.revealed = revA(d.revealed, d.start.x, d.start.y, VR);
     setPlayer(p);
     setDun(d);
@@ -1320,17 +1749,23 @@ function Game() {
     setInSanc(false);
     setLastSanc(0);
     setWand(spawnW(d, 1));
-    setStats({ kills: 0, chests: 0, totG: 0, megaK: 0, erebus: false, steps: 0 });
+    setStats({ kills: 0, chests: 0, totG: 0, megaK: 0, erebus: false, steps: 0, seen: {} });
     setPendingDeath(false);
     setCompletedQuests(/* @__PURE__ */ new Set());
     setArmory([]);
     setSubArea(null);
     setSancShop(null);
-    setELog([{ m: `${base.name} enters. Floor 1 \u2014 ${d.fc.name} ${d.fc.icon}`, ty: "system", ts: Date.now() }]);
+    setStatPoints(0);
+    setPassives([]);
+    setLoreLog([]);
+    setTrail([]);
+    setMoralChoice(null);
+    setSpecialization(null);
+    setELog([{ m: `${pName} enters. Floor 1 \u2014 ${d.fc.name} ${d.fc.icon}`, ty: "system", ts: Date.now() }]);
     setCombat(null);
     setMenu(null);
     setScreen("game");
-  }, []);
+  }, [charName]);
   function spawnW(d, f) {
     if (d.isSanc) return [];
     const e = [];
@@ -1434,6 +1869,12 @@ function Game() {
     const tierIdx = Math.floor((af - 1) / 10);
     if (SANC_PLAQUES[tierIdx]) log(`\u{1F4DC} "${SANC_PLAQUES[tierIdx]}"`, "lore");
     if (SANC_NPC[tierIdx]) log(`\u{1F9D9} "${SANC_NPC[tierIdx]}"`, "system");
+    const bt = BOUNTY_TARGETS[Math.min(tierIdx, BOUNTY_TARGETS.length - 1)];
+    const breq = rng(3, 6);
+    const brew = rng(50 + af * 5, 100 + af * 10);
+    setBounty({ target: bt, required: breq, current: 0, reward: brew });
+    log(`\u{1F4CB} Bounty: Kill ${breq} ${bt}s for ${brew}g`, "system");
+    log("\u{1F489} Sanctuary: Stat potions available in shop.", "system");
   }, [log, flash]);
   const nextFloor = useCallback(() => {
     if (inSanc) {
@@ -1485,6 +1926,10 @@ function Game() {
     log(`Floor ${nf} \u2014 ${fc2.name} ${fc2.icon}`, "system");
     if (nf % 10 === 0) log("\u26A0\uFE0F MEGA BOSS!", "danger");
     if (intro) log(`"${intro}"`, "lore");
+    if (nf % 10 !== 0 && nf % 5 !== 0 && Math.random() < 0.15) {
+      const mc = MORAL_CHOICES[rng(0, MORAL_CHOICES.length - 1)];
+      setTimeout(() => setMoralChoice(mc), 800);
+    }
   }, [player, inSanc, enterSanctuary, log]);
   const respawn = useCallback(() => {
     if (lastSanc <= 0) return;
@@ -1493,6 +1938,7 @@ function Game() {
     setPlayer((p) => ({ ...p, floor: lastSanc, gold: Math.floor(p.gold * 0.75), xp: Math.floor(p.xp * 0.7) }));
     setCombat(null);
     setMenu(null);
+    setKillStreak(0);
     log("Respawned. -25% gold, -30% XP.", "system");
     setScreen("game");
   }, [lastSanc, enterSanctuary, log]);
@@ -1564,11 +2010,48 @@ function Game() {
           np.poisoned = false;
           log("Full restore!", "heal");
         }
+        if (item.effect === "speed") {
+          np.dex = np.dex + item.amt;
+          np.speedB = (np.speedB || 0) + item.amt;
+          log(`+${item.amt} DEX (temporary)!`, "info");
+        }
+        if (item.effect === "shield") {
+          np.def = np.def + item.amt;
+          np.shieldB = (np.shieldB || 0) + item.amt;
+          log(`+${item.amt} DEF (temporary)!`, "info");
+        }
+        if (item.effect === "perm_str") {
+          np.str++;
+          log("+1 STR (permanent)!", "levelup");
+        }
+        if (item.effect === "perm_dex") {
+          np.dex++;
+          log("+1 DEX (permanent)!", "levelup");
+        }
+        if (item.effect === "perm_int") {
+          np.int++;
+          log("+1 INT (permanent)!", "levelup");
+        }
         return np;
       });
-      if (["hp", "mp", "cure", "full", "revive"].includes(item.effect)) {
+      if (["hp", "mp", "cure", "full", "revive", "speed", "shield"].includes(item.effect)) {
         SFX.heal();
         flash("heal");
+      }
+      if (item.effect === "warp") {
+        if (lastSanc > 0) {
+          SFX.portal();
+          log("Warped to sanctuary!", "system");
+          enterSanctuary(lastSanc);
+          setPlayer((p) => ({ ...p, floor: lastSanc }));
+        } else {
+          log("No sanctuary discovered yet!", "danger");
+          setPlayer((p) => ({ ...p, inv: [...p.inv, { ...item, id: uid() }] }));
+        }
+      }
+      if (item.effect === "key") {
+        log("Use keys on locked doors (\u{1F512}).", "info");
+        setPlayer((p) => ({ ...p, inv: [...p.inv, { ...item, id: uid() }] }));
       }
       if (inC && item.effect === "damage") {
         SFX.hit();
@@ -1585,10 +2068,11 @@ function Game() {
         });
       }
     }
-  }, [log, flash, addParticles]);
+  }, [log, flash, addParticles, lastSanc, enterSanctuary]);
   const startCombat = useCallback((enemy) => {
     const dm = settings.difficulty === "easy" ? 0.8 : settings.difficulty === "hard" ? 1.35 : 1;
-    const scaled = { ...enemy, hp: Math.floor(enemy.hp * dm), maxHp: Math.floor(enemy.maxHp * dm), atk: Math.floor(enemy.atk * dm) };
+    const ngM = 1 + ngPlus * 0.1;
+    const scaled = { ...enemy, hp: Math.floor(enemy.hp * dm * ngM), maxHp: Math.floor(enemy.maxHp * dm * ngM), atk: Math.floor(enemy.atk * dm * ngM) };
     setCombatAnim(null);
     setCInv(false);
     setMenu(null);
@@ -1596,13 +2080,14 @@ function Game() {
     setCombat({ enemy: { ...scaled, burn: 0, freeze: 0, stun: 0 }, phase: hasDlg ? "dialogue" : "player", turn: 1, dialogue: hasDlg ? BOSS_DIALOGUE[scaled.name] : null, lastSkill: null });
     setCLog([`${scaled.isMega ? "\u26A0\uFE0F MEGA BOSS \u2014 " : ""}${scaled.isBoss && !scaled.isMega ? "\u{1F479} BOSS: " : ""}${scaled.isChampion ? "\u2605 CHAMPION: " : ""}${scaled.icon} ${scaled.name}!${scaled.title ? " \u2014 " + scaled.title : ""}${scaled.subtitle ? " \u2014 " + scaled.subtitle : ""}`]);
     log(`${scaled.isBoss ? "BOSS: " : ""}${scaled.name}!`, "danger");
+    setStats((p) => ({ ...p, seen: { ...p.seen, [scaled.name]: { icon: scaled.icon, kills: p.seen?.[scaled.name]?.kills || 0 } } }));
     if (scaled.isMega) {
       SFX.bossEntrance();
     } else if (scaled.isBoss) {
       SFX.boss();
     }
     if (hasDlg) setTimeout(() => setCombat((c) => c && c.phase === "dialogue" ? { ...c, phase: "player" } : c), 2500);
-  }, [log, settings.difficulty]);
+  }, [log, settings.difficulty, ngPlus]);
   const calcPlayerDmg = (raw, eDef, variance) => {
     const red = eDef / (eDef + raw + 40);
     const base = raw * (1 - red);
@@ -1877,6 +2362,8 @@ function Game() {
     const drops = [];
     if (e.isMega) {
       for (let i = 0; i < rng(2, 3); i++) drops.push(getChestLoot(player.floor));
+      const bonusPool = CONS.filter((c) => c.lvl <= player.floor + 20 && c.val >= 25);
+      if (bonusPool.length > 0) drops.push({ ...bonusPool[rng(0, bonusPool.length - 1)], id: uid() });
     } else if (e.isBoss) {
       for (let i = 0; i < rng(1, 2); i++) drops.push(getChestLoot(player.floor));
     } else if (e.isChampion) {
@@ -1912,6 +2399,15 @@ function Game() {
         });
       }
       const lvlsGained = np.level - startLvl;
+      if (lvlsGained > 0) setStatPoints((sp) => sp + lvlsGained * 2);
+      if (lvlsGained > 0) {
+        for (let l = startLvl + 1; l <= np.level; l++) {
+          if (l % 10 === 0 && l <= 50) {
+            const pi = Math.floor(l / 10) - 1;
+            if (pi >= 0 && pi < PERKS.length) log(`\u{1F31F} Perk available! Open Stats menu.`, "levelup");
+          }
+        }
+      }
       if (lvlsGained > 0) {
         SFX.levelUp();
         flash("heal");
@@ -1948,10 +2444,35 @@ function Game() {
       return np;
     });
     if (bossGear.length) setArmory((a) => [...a, ...bossGear]);
-    if (e.isBoss && !e.isBarrier && !e.isMini) setBossAlive(false);
+    if (e.isBoss && !e.isBarrier && !e.isMini) {
+      setBossAlive(false);
+      log("\u{1F6AA} Boss defeated! Stairs are now open.", "system");
+    }
     if (e.isMini) setDun((d) => ({ ...d, hasMini: false, bossPos: null }));
     setWand((p) => p.filter((w) => w.id !== e.id));
-    setStats((p) => ({ ...p, kills: p.kills + 1, totG: p.totG + e.gold, megaK: p.megaK + (e.isMega ? 1 : 0), erebus: p.erebus || e.name === "Erebus" }));
+    setStats((p) => ({ ...p, kills: p.kills + 1, totG: p.totG + e.gold, megaK: p.megaK + (e.isMega ? 1 : 0), erebus: p.erebus || e.name === "Erebus", seen: { ...p.seen, [e.name]: { icon: e.icon, kills: (p.seen?.[e.name]?.kills || 0) + 1 } } }));
+    setKillStreak((ks) => {
+      const nks = ks + 1;
+      if (nks >= 3) {
+        const bonus = Math.floor(xpG * 0.1 * Math.min(nks, 10));
+        setPlayer((p) => ({ ...p, xp: p.xp + bonus }));
+        if (nks % 3 === 0) log(`\u{1F525} Kill streak x${nks}! +${bonus} bonus XP`, "levelup");
+      }
+      return nks;
+    });
+    if (bounty && e.name.includes(bounty.target)) {
+      setBounty((b) => {
+        if (!b) return b;
+        const nb = { ...b, current: b.current + 1 };
+        if (nb.current >= nb.required) {
+          log(`\u{1F4CB} Bounty complete! +${nb.reward}g`, "loot");
+          setPlayer((p) => ({ ...p, gold: p.gold + nb.reward }));
+          showFloat(`+${nb.reward}g`, "#d4a843");
+          return null;
+        }
+        return nb;
+      });
+    }
     log(`${e.isBoss ? "\u{1F3C6}" : "\u2694\uFE0F"} ${e.name}! +${xpG}xp +${e.gold}g`, "victory");
     if (drops.length > 0) log(`Drop: ${drops.map((d) => `${d.icon} ${d.name}`).join(", ")}`, "loot");
     else log("No drops.", "info");
@@ -1979,6 +2500,40 @@ function Game() {
         SFX.chest();
         flash("loot");
         log("\u{1F52E} Hidden passage revealed!", "loot");
+      }
+      return;
+    }
+    if (tile === T.CRACKED) {
+      if (player.str > 20 && Math.random() < 0.3 + player.str * 5e-3) {
+        setTile(ny, nx, T.FLOOR);
+        SFX.trap();
+        shk();
+        log("\u{1F4A5} Cracked wall shattered!", "loot");
+        if (Math.random() < 0.4) {
+          const g = rng(10 + player.floor * 2, 30 + player.floor * 4);
+          setPlayer((p) => ({ ...p, gold: p.gold + g }));
+          showFloat(`+${g}g`, "#d4a843");
+          log(`Found ${g}g behind the wall!`, "loot");
+        }
+      } else {
+        log("\u2592 Cracked wall... needs more force.", "system");
+      }
+      return;
+    }
+    if (tile === T.LOCKED) {
+      const keyItem = player.inv.find((i) => i.effect === "key");
+      if (keyItem) {
+        setPlayer((p) => ({ ...p, inv: p.inv.filter((i) => i.id !== keyItem.id) }));
+        setTile(ny, nx, T.FLOOR);
+        SFX.chest();
+        flash("loot");
+        log("\u{1F511} Unlocked!", "loot");
+        const g = rng(20 + player.floor * 3, 50 + player.floor * 5);
+        setPlayer((p) => ({ ...p, gold: p.gold + g }));
+        showFloat(`+${g}g`, "#d4a843");
+      } else {
+        log("\u{1F512} Locked! Need a key.", "danger");
+        SFX.error();
       }
       return;
     }
@@ -2020,6 +2575,11 @@ function Game() {
           setPendingDeath(true);
           lethal = true;
         }
+        if (!willDie && Math.random() < 0.25) {
+          const loot = getChestLoot(player.floor);
+          setPlayer((p) => ({ ...p, inv: [...p.inv, loot] }));
+          log(`Found ${loot.icon} ${loot.name} in the wreckage!`, "loot");
+        }
       }
       setTile(ny, nx, T.FLOOR);
     }
@@ -2027,8 +2587,16 @@ function Game() {
       SFX.chest();
       flash("loot");
       addParticles(6, "#fa0");
+      const isSubChest = !!subArea;
       const loot = getChestLoot(player.floor);
-      const g = rng(5 + player.floor * 2, 12 + player.floor * 5);
+      const g = rng(5 + player.floor * 2, 12 + player.floor * 5) * (isSubChest ? 2 : 1);
+      let bonusMsg = "";
+      if (isSubChest && Math.random() < 0.4) {
+        const statBonus = ["str", "dex", "int"][rng(0, 2)];
+        const statName = statBonus.toUpperCase();
+        setPlayer((p) => ({ ...p, [statBonus]: p[statBonus] + 1 }));
+        bonusMsg = ` +1 ${statName} (Rune Fragment)!`;
+      }
       setPlayer((p) => {
         let np = { ...p, inv: [...p.inv, loot], gold: p.gold + g };
         const cons = np.inv.filter((i) => i.type === "consumable");
@@ -2046,7 +2614,7 @@ function Game() {
         return np;
       });
       setStats((p) => ({ ...p, chests: p.chests + 1, totG: p.totG + g }));
-      log(`Chest! ${loot.icon} ${loot.name} +${g}g`, "loot");
+      log(`Chest! ${loot.icon} ${loot.name} +${g}g${bonusMsg}`, "loot");
       showFloat(`+${g}g`, "#d4a843");
       setTile(ny, nx, T.FLOOR);
     }
@@ -2131,7 +2699,19 @@ function Game() {
         } else if (fdc.eff === "buff_atk") {
           setPlayer((p) => ({ ...p, str: p.str + 1 }));
           showFloat("+1 STR", "#fa8");
-          log("+1 STR (permanent)!", "levelup");
+          log(fdc.msg || "+1 STR (permanent)!", "levelup");
+        } else if (fdc.eff === "def") {
+          setPlayer((p) => ({ ...p, baseDef: p.baseDef + (fdc.amt || 1) }));
+          showFloat("+1 DEF", "#8ac");
+          log(fdc.msg || "+1 DEF!", "levelup");
+        } else if (fdc.eff === "hp" && fdc.amt === 0) {
+          setPlayer((p) => ({ ...p, hp: p.maxHp, mp: p.maxMp }));
+          showFloat("Restored!", "#4c6");
+          log(fdc.msg || "Fully healed!", "heal");
+        } else if (fdc.eff === "str") {
+          setPlayer((p) => ({ ...p, str: p.str + (fdc.amt || 1) }));
+          showFloat("+1 STR", "#fa8");
+          log(fdc.msg || "+1 STR!", "levelup");
         } else if (fdc.eff === "item") {
           const loot = getChestLoot(player.floor);
           setPlayer((p) => ({ ...p, inv: [...p.inv, loot] }));
@@ -2141,6 +2721,11 @@ function Game() {
           const r = dun.rooms[ri];
           if (r) setPlayer((p) => ({ ...p, x: r.cx, y: r.cy }));
           log("Teleported!", "system");
+        } else if (fdc.eff === "puzzle" && fdc.targetX >= 0 && fdc.targetY >= 0) {
+          setTile(fdc.targetY, fdc.targetX, T.CHEST);
+          SFX.portal();
+          shk();
+          log("\u{1F518} Click! Something opened nearby...", "loot");
         } else if (fdc.eff === "reveal") {
           setDun((d) => {
             const nr = d.map.map((row, y) => row.map((_, x) => true));
@@ -2173,6 +2758,53 @@ function Game() {
           log("\u{1F9CA} You slide!", "system");
         }
         if (cdc.hazType === "bones" && Math.random() < 0.1) log("\u{1F9B4} Something crunches...", "system");
+      }
+    }
+    {
+      const cacheD = dun.decor && dun.decor.get ? dun.decor.get(`${nx},${ny}`) : null;
+      if (cacheD && cacheD.type === "cache" && cacheD.gold) {
+        SFX.chest();
+        flash("loot");
+        const g = cacheD.gold;
+        setPlayer((p) => ({ ...p, gold: p.gold + g }));
+        showFloat(`+${g}g`, "#d4a843");
+        log(`Hidden cache! +${g}g`, "loot");
+        if (dun.decor.delete) dun.decor.delete(`${nx},${ny}`);
+      }
+    }
+    if (tile === T.LORE) {
+      const ldc = dun.decor && dun.decor.get ? dun.decor.get(`${nx},${ny}`) : null;
+      if (ldc && ldc.text) {
+        SFX.chest();
+        log(`\u{1F4DC} ${ldc.text}`, "lore");
+        setLoreLog((p) => {
+          if (p.some((e) => e.text === ldc.text)) return p;
+          return [...p, { text: ldc.text, tier: ldc.tier || getTier(player.floor), floor: player.floor }];
+        });
+        setTile(ny, nx, T.FLOOR);
+      }
+    }
+    if (tile === T.NPC) {
+      const ndc = dun.decor && dun.decor.get ? dun.decor.get(`${nx},${ny}`) : null;
+      if (ndc) {
+        SFX.sanctuary();
+        log(`${ndc.icon} ${ndc.name}: "${ndc.line}"`, "lore");
+        if (Math.random() < 0.3) {
+          const g = rng(10, 30 + player.floor * 2);
+          setPlayer((p) => ({ ...p, gold: p.gold + g }));
+          log(`${ndc.name} gave you ${g} gold.`, "loot");
+          showFloat(`+${g}g`, "#d4a843");
+        }
+        setTile(ny, nx, T.FLOOR);
+      }
+    }
+    if (tile === T.ECHO) {
+      const edc = dun.decor && dun.decor.get ? dun.decor.get(`${nx},${ny}`) : null;
+      if (edc && edc.text) {
+        SFX.boss();
+        log(`\u{1F441}\uFE0F Erebus: "${edc.text}"`, "lore");
+        shk();
+        setTile(ny, nx, T.FLOOR);
       }
     }
     if (tile === T.SHOP) {
@@ -2211,7 +2843,22 @@ function Game() {
         setSubArea({ parentDun: dun, parentPos: { x: player.x, y: player.y }, parentWand, entrancePos: { x: nx, y: ny } });
         setDun(sub);
         setPlayer((p) => ({ ...p, x: sub.start.x, y: sub.start.y }));
-        setWand([]);
+        const subEnemies = [];
+        const seCount = sub.subType === 2 ? 1 : rng(2, 4);
+        for (let i = 0; i < seCount; i++) {
+          const e = getEnemy(player.floor);
+          const se = { ...e, name: `${sub.subType === 1 ? "Vault" : "Shadow"} ${e.name}`, hp: Math.floor(e.hp * 1.3), maxHp: Math.floor(e.hp * 1.3), atk: Math.floor(e.atk * 1.2), xp: Math.floor(e.xp * 1.5), gold: Math.floor(e.gold * 2) };
+          for (let a = 0; a < 30; a++) {
+            const px = rng(1, MW - 2), py = rng(1, MH - 2);
+            if (sub.map[py] && sub.map[py][px] === T.FLOOR && !(px === sub.start.x && py === sub.start.y)) {
+              se.x = px;
+              se.y = py;
+              subEnemies.push(se);
+              break;
+            }
+          }
+        }
+        setWand(subEnemies);
         SFX.portal();
         flash("loot");
         log(`\u{1F52E} Entered ${sub.fc.name}!`, "system");
@@ -2265,6 +2912,19 @@ function Game() {
     if (player.mp < player.maxMp) setPlayer((p) => ({ ...p, mp: Math.min(p.maxMp, p.mp + mpRegen) }));
     if (player.poisoned) setPlayer((p) => ({ ...p, hp: Math.max(1, p.hp - 2) }));
     if (!inSanc) moveW();
+    if (!inSanc && !subArea && Math.random() < 0.03) {
+      const ev = FLOOR_EVENTS[rng(0, FLOOR_EVENTS.length - 1)];
+      log(`\u2728 ${ev.msg}`, "system");
+      if (ev.eff === "hp") setPlayer((p) => ({ ...p, hp: Math.min(p.maxHp, p.hp + ev.amt) }));
+      else if (ev.eff === "mp") setPlayer((p) => ({ ...p, mp: Math.min(p.maxMp, p.mp + ev.amt) }));
+      else if (ev.eff === "gold") setPlayer((p) => ({ ...p, gold: p.gold + ev.amt + player.floor }));
+      else if (ev.eff === "xp") setPlayer((p) => ({ ...p, xp: p.xp + ev.amt + player.floor }));
+      else if (ev.eff === "loot") {
+        const loot = getChestLoot(player.floor);
+        setPlayer((p) => ({ ...p, inv: [...p.inv, loot] }));
+        log(`Found ${loot.icon} ${loot.name}!`, "loot");
+      }
+    }
   }, [player, dun, combat, menu, shop, wand, bossAlive, inSanc, subArea, sancShop, nextFloor, startCombat, moveW, log, shk, setTile, flash, addParticles, showFloat, mapReact]);
   const [completedQuests, setCompletedQuests] = useState(() => /* @__PURE__ */ new Set());
   const saveGame = useCallback((slot) => {
@@ -2332,6 +2992,15 @@ function Game() {
       if (combat) {
         if (combat.phase === "won" && (e.key === "Enter" || e.key === " ")) claimWin();
         if (combat.phase === "lost" && (e.key === "Enter" || e.key === " ")) handleDeath();
+        if (combat.phase === "player") {
+          if (k === "a") pAtk();
+          else if (k === "f") flee();
+          else if (k === "i") setCInv((c) => !c);
+          else if (k >= "1" && k <= "5") {
+            const si = parseInt(k) - 1;
+            if (player.unlocked[si]) pAtk(player.unlocked[si]);
+          }
+        }
         return;
       }
       if (menu) {
@@ -2359,7 +3028,7 @@ function Game() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [screen, combat, menu, shop, move, claimWin, handleDeath, keybinds, saveGame]);
+  }, [screen, combat, menu, shop, move, claimWin, handleDeath, keybinds, saveGame, pAtk, flee]);
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [eLog]);
@@ -2398,6 +3067,12 @@ function Game() {
       });
       setPlayer((p) => ({ ...p, xp: p.xp + xpGain }));
     }
+    ACHIEVEMENTS.forEach((a) => {
+      if (!achievements.includes(a.id) && a.c(st)) {
+        setAchievements((p) => [...p, a.id]);
+        log(`\u{1F3C6} Achievement: ${a.name}!`, "levelup");
+      }
+    });
   }, [stats.kills, stats.chests, player?.floor, player?.level]);
   useEffect(() => {
     if (player && dun && screen === "game" && !subArea) {
@@ -2505,17 +3180,32 @@ function Game() {
       else if (t === T.PORTAL) c = "#d4f";
       else if (t === T.BARRIER) c = "#f84";
       else if (t === T.FEATURE) c = "#d4a843";
+      else if (t === T.LORE) c = "#c9a84c";
+      else if (t === T.NPC) c = "#8cf";
+      else if (t === T.ECHO) c = "#ffd700";
+      else if (t === T.LOCKED) c = "#fa0";
+      else if (t === T.CRACKED) c = "#887755";
       else if (t === T.WALL) c = fc.wall;
       if (player && x === player.x && y === player.y) c = "#ffd700";
       dots.push(/* @__PURE__ */ React.createElement("div", { key: `${x}-${y}`, style: { position: "absolute", left: x * mmS, top: y * mmS, width: mmS, height: mmS, background: c } }));
     }
+    if (bossAlive && dun.bossPos) {
+      dots.push(/* @__PURE__ */ React.createElement("div", { key: "boss", style: { position: "absolute", left: dun.bossPos.x * mmS - 1, top: dun.bossPos.y * mmS - 1, width: mmS + 2, height: mmS + 2, background: "#f22", borderRadius: "50%", animation: "glow 1s infinite", zIndex: 2 } }));
+    }
     return dots;
-  }, [dun, player?.x, player?.y, settings.minimap, mmS, fc]);
+  }, [dun, player?.x, player?.y, settings.minimap, mmS, fc, bossAlive]);
   const btnS = { padding: "7px 12px", background: "#111119", border: "1px solid #2a2a3a", color: "#888", borderRadius: 7, fontSize: 10, cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", touchAction: "manipulation" };
   const fullScreen = (bg, ch) => /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", marginLeft: "env(safe-area-inset-left,0px)", marginRight: "env(safe-area-inset-right,0px)", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", userSelect: "none", padding: 24 } }, ch));
   const LORE_TIPS = ["The Hollow Kingdom mined Luminite for 300 years before they dug too deep.", "Erebus was once the kingdom's most brilliant sorcerer.", "The Heart of Shadow was waiting on Floor 100 \u2014 as if it had always been waiting.", "Queen Tiamat traded her people's humanity to save their lives.", "The ice gardens of Floor 51-60 were once the most beautiful place underground.", "Malachar, the undead priest, still believes he is preserving knowledge.", "The void research labs on Floor 61-70 were sealed by royal decree.", "Ignatius Rex cannot stop the fire. He IS the fire.", "Azathoth sleeps. The entire tier is its nightmare.", "Ten lieutenants guard the Depths. Each was once human."];
   const loreTip = useMemo(() => LORE_TIPS[Math.floor(Math.random() * LORE_TIPS.length)], [screen]);
-  if (screen === "title") return fullScreen("radial-gradient(ellipse at 50% 35%,#1e1a10,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, color: "#d4a843", textShadow: "0 0 30px #d4a84333", letterSpacing: 4, textAlign: "center", lineHeight: 1.2, fontFamily: "'Cinzel',serif" } }, "DEPTHS OF", /* @__PURE__ */ React.createElement("br", null), "SHADOW"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", letterSpacing: 5, marginTop: 10, fontFamily: "'JetBrains Mono',monospace" } }, "A DUNGEON CRAWLER"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginTop: 14, textAlign: "center", fontStyle: "italic", maxWidth: 300, lineHeight: 1.5, fontFamily: "'JetBrains Mono',monospace" } }, loreTip), /* @__PURE__ */ React.createElement("div", { style: { width: "60%", height: 1, background: "linear-gradient(90deg,transparent,#d4a84344,transparent)", margin: "18px 0" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 240 } }, /* @__PURE__ */ React.createElement("button", { style: { padding: "14px 0", background: "#1a1508", border: "1px solid #8b691466", color: "#d4a843", borderRadius: 8, fontSize: 14, letterSpacing: 3, fontFamily: "'Cinzel',serif", cursor: "pointer" }, onClick: () => setScreen("story") }, "NEW GAME"), [1, 2, 3].map((sl) => {
+  const hasWon = useMemo(() => {
+    try {
+      return localStorage.getItem("dos_victory") === "1";
+    } catch (e) {
+      return false;
+    }
+  }, [screen]);
+  if (screen === "title") return fullScreen(hasWon ? "radial-gradient(ellipse at 50% 35%,#2a2410,#1a1408 40%,#0c0c14 65%)" : "radial-gradient(ellipse at 50% 35%,#1e1a10,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, color: "#d4a843", textShadow: "0 0 30px #d4a84333", letterSpacing: 4, textAlign: "center", lineHeight: 1.2, fontFamily: "'Cinzel',serif" } }, "DEPTHS OF", /* @__PURE__ */ React.createElement("br", null), "SHADOW"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", letterSpacing: 5, marginTop: 10, fontFamily: "'JetBrains Mono',monospace" } }, "A DUNGEON CRAWLER"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginTop: 14, textAlign: "center", fontStyle: "italic", maxWidth: 300, lineHeight: 1.5, fontFamily: "'JetBrains Mono',monospace" } }, loreTip), /* @__PURE__ */ React.createElement("div", { style: { width: "60%", height: 1, background: "linear-gradient(90deg,transparent,#d4a84344,transparent)", margin: "18px 0" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 240 } }, /* @__PURE__ */ React.createElement("button", { style: { padding: "14px 0", background: "#1a1508", border: "1px solid #8b691466", color: "#d4a843", borderRadius: 8, fontSize: 14, letterSpacing: 3, fontFamily: "'Cinzel',serif", cursor: "pointer" }, onClick: () => setScreen("story") }, "NEW GAME"), [1, 2, 3].map((sl) => {
     const s = save[sl];
     return s ? /* @__PURE__ */ React.createElement("div", { key: sl, style: { display: "flex", gap: 4 } }, /* @__PURE__ */ React.createElement("button", { style: { flex: 1, padding: "10px 0", background: "#111119", border: "1px solid #2a2a3a", color: "#888", borderRadius: 8, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", cursor: "pointer", textAlign: "center" }, onClick: () => {
       setActiveSlot(sl);
@@ -2554,16 +3244,32 @@ function Game() {
       setScreen("classSelect");
     } }, "Skip"))));
   }
-  if (screen === "classSelect") return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", marginLeft: "env(safe-area-inset-left,0px)", marginRight: "env(safe-area-inset-right,0px)", overflow: "auto", background: "#0c0c14", display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 16px", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 4, marginBottom: 8, fontFamily: "'Cinzel',serif" } }, "CHOOSE CLASS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginBottom: 16 } }, "Saving to Slot ", activeSlot, " \xB7 ", /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", gap: 4 } }, [1, 2, 3].map((sl) => /* @__PURE__ */ React.createElement("button", { key: sl, style: { ...btnS, fontSize: 9, padding: "2px 8px", borderColor: activeSlot === sl ? "#d4a84466" : "#2a2a3a", color: activeSlot === sl ? "#d4a843" : "#444" }, onClick: () => setActiveSlot(sl) }, sl, save[sl] ? ` (${save[sl].player?.name})` : " (empty)")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 340 } }, Object.entries(CLASSES).map(([k, c]) => {
+  if (screen === "classSelect") return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", marginLeft: "env(safe-area-inset-left,0px)", marginRight: "env(safe-area-inset-right,0px)", overflow: "auto", background: "#0c0c14", display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 16px", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 4, marginBottom: 8, fontFamily: "'Cinzel',serif" } }, "CHOOSE CLASS"), /* @__PURE__ */ React.createElement("input", { type: "text", value: charName, onChange: (e) => setCharName(e.target.value.slice(0, 16)), placeholder: "Enter name (optional)", style: { width: "100%", maxWidth: 280, padding: "8px 12px", background: "#111119", border: "1px solid #2a2a3a", borderRadius: 8, color: "#d4a843", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", textAlign: "center", marginBottom: 10, outline: "none" } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginBottom: 16 } }, "Saving to Slot ", activeSlot), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 340 } }, Object.entries(CLASSES).map(([k, c]) => {
     const backstory = { warrior: "The Last Knight. Sent by the remnants of the kingdom's military. Fights out of duty.", mage: "The Scholar's Apprentice. Your master joined Erebus' expedition and never returned.", thief: "The Survivor. An orphan of the collapse. No one sent you \u2014 no one else would go." }[k];
     return /* @__PURE__ */ React.createElement("button", { key: k, onClick: () => startGame(k), style: { padding: 14, textAlign: "left", display: "flex", gap: 12, alignItems: "center", background: "#111119", border: "1px solid #2a2a3a", borderRadius: 10, cursor: "pointer", color: "#c8c8d0", fontFamily: "'JetBrains Mono',monospace" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 30, width: 40, textAlign: "center" } }, c.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#d4a843", fontFamily: "'Cinzel',serif" } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.4 } }, c.desc), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#6a6a5a", marginTop: 2, fontStyle: "italic", lineHeight: 1.4 } }, backstory), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#4a4a5a", marginTop: 4 } }, "HP:", c.hp, " MP:", c.mp, " STR:", c.str, " DEX:", c.dex, " INT:", c.int)));
   })), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 18, ...btnS }, onClick: () => setScreen("title") }, "\u2190 Back")));
   if (screen === "respawn") return fullScreen("radial-gradient(ellipse at center,#0a1828,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 40 } }, "\u{1F3D5}\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, color: "#66bbee", letterSpacing: 3, fontFamily: "'Cinzel',serif" } }, "SANCTUARY RESPAWN"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#999", marginTop: 10, textAlign: "center", lineHeight: 1.6, fontStyle: "italic", maxWidth: 320 } }, "Something pulled you back. The fight isn't over."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginTop: 8, textAlign: "center", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" } }, "Fell on Floor ", player?.floor, ".", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#c84" } }, "-25% gold, -30% XP")), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 24, padding: "12px 28px", background: "#0a1828", border: "1px solid #6be4", color: "#6be", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif", letterSpacing: 2 }, onClick: respawn }, "RESPAWN")));
-  if (screen === "gameOver") return fullScreen("radial-gradient(ellipse at center,#2a0808,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 44 } }, "\u{1F480}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, color: "#c33", letterSpacing: 4, fontFamily: "'Cinzel',serif" } }, "YOU DIED"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginTop: 10, textAlign: "center", lineHeight: 1.6, fontStyle: "italic", maxWidth: 320 } }, "The shadow grows deeper. But the seal holds \u2014 for now."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginTop: 8, fontFamily: "'JetBrains Mono',monospace" } }, "F", player?.floor, " \xB7 Lv", player?.level, " \xB7 ", stats.kills, " kills"), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 24, padding: "12px 28px", background: "#1a0808", border: "1px solid #a336", color: "#c44", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif" }, onClick: () => setScreen("classSelect") }, "Try Again"), save[activeSlot] && /* @__PURE__ */ React.createElement("button", { style: { marginTop: 8, ...btnS }, onClick: () => {
+  if (screen === "gameOver") return fullScreen("radial-gradient(ellipse at center,#2a0808,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 44 } }, "\u{1F480}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, color: "#c33", letterSpacing: 4, fontFamily: "'Cinzel',serif" } }, "YOU DIED"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginTop: 10, textAlign: "center", lineHeight: 1.6, fontStyle: "italic", maxWidth: 320 } }, "The shadow grows deeper. But the seal holds \u2014 for now."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginTop: 8, fontFamily: "'JetBrains Mono',monospace" } }, "F", player?.floor, " \xB7 Lv", player?.level, " \xB7 ", stats.kills, " kills"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#444", marginTop: 6, textAlign: "center", maxWidth: 280 } }, eLog.slice(-3).filter((e) => e.ty === "danger").map((e) => e.m).join(" \u2192 ") || "Fell to the darkness."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginTop: 4 } }, "Time: ", Math.floor(gameTime / 60), "m ", gameTime % 60, "s"), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 24, padding: "12px 28px", background: "#1a0808", border: "1px solid #a336", color: "#c44", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif" }, onClick: () => setScreen("classSelect") }, "Try Again"), save[activeSlot] && /* @__PURE__ */ React.createElement("button", { style: { marginTop: 8, ...btnS }, onClick: () => {
     loadGame();
     setScreen("game");
   } }, "Load Slot ", activeSlot)));
-  if (screen === "victory") return fullScreen("radial-gradient(ellipse at center,#1a1a08,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 48 } }, "\u{1F451}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, color: "#d4a843", letterSpacing: 4, fontFamily: "'Cinzel',serif", marginTop: 8 } }, "VICTORY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#999", marginTop: 4 } }, "All 100 floors conquered!"), /* @__PURE__ */ React.createElement("div", { style: { width: "80%", maxWidth: 280, height: 1, background: "linear-gradient(90deg,transparent,#d4a84344,transparent)", margin: "16px 0" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 20px", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" } }, [["Class", player?.name], ["Level", player?.level], ["Difficulty", settings.difficulty], ["Enemies Slain", stats.kills], ["Chests Opened", stats.chests], ["Steps Walked", stats.steps], ["Mega Bosses", stats.megaK], ["Gold Earned", stats.totG], ["Armory Items", armory.length]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, l), /* @__PURE__ */ React.createElement("span", { style: { color: "#d4a843" } }, v)))), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 20, ...btnS, borderColor: "#d4a8434", color: "#d4a843", padding: "12px 28px" }, onClick: () => setScreen("title") }, "Return to Title")));
+  if (screen === "victory") return fullScreen("radial-gradient(ellipse at center,#1a1a08,#0c0c14 65%)", /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 48 } }, "\u{1F451}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, color: "#d4a843", letterSpacing: 4, fontFamily: "'Cinzel',serif", marginTop: 8 } }, "VICTORY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#999", marginTop: 8, textAlign: "center", lineHeight: 1.8, fontStyle: "italic", maxWidth: 320 } }, "The Heart of Shadow pulses before you. It offers everything.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#d4a843" } }, "You walk away.")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 12, textAlign: "center", lineHeight: 1.8, fontStyle: "italic", maxWidth: 340 } }, player?.cls === "warrior" ? "The Warrior sheathes their blade. The kingdom has no more need of soldiers. For the first time, that feels like peace." : player?.cls === "mage" ? "The Mage closes the forbidden tome. Some knowledge is better left in the dark. They finally understand what their master could not." : "The Thief pockets one small Luminite shard \u2014 enough to sell, enough to survive. Old habits. They smile. The surface has never looked so bright."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", marginTop: 8, textAlign: "center", fontStyle: "italic" } }, settings.difficulty === "hard" ? "They walked through fire and shadow, and the fire learned to flinch." : settings.difficulty === "easy" ? "The path was gentle. The darkness was not." : "The Depths remember their name."), /* @__PURE__ */ React.createElement("div", { style: { width: "80%", maxWidth: 280, height: 1, background: "linear-gradient(90deg,transparent,#d4a84344,transparent)", margin: "14px 0" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 20px", fontSize: 10, fontFamily: "'JetBrains Mono',monospace" } }, [["Name", player?.name], ["Level", player?.level], ["Difficulty", settings.difficulty], ["Enemies", stats.kills], ["Steps", stats.steps], ["Gold", stats.totG]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, l), /* @__PURE__ */ React.createElement("span", { style: { color: "#d4a843" } }, v)))), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 16, ...btnS, borderColor: "#d4a8434", color: "#d4a843", padding: "12px 28px" }, onClick: () => {
+    try {
+      localStorage.setItem("dos_victory", "1");
+    } catch (e) {
+    }
+    setScreen("title");
+  } }, "Return to Title"), /* @__PURE__ */ React.createElement("button", { style: { marginTop: 6, ...btnS, borderColor: "#fa06", color: "#fa0", padding: "10px 24px", fontSize: 10 }, onClick: () => {
+    try {
+      localStorage.setItem("dos_victory", "1");
+    } catch (e) {
+    }
+    const ng = ngPlus + 1;
+    setNgPlus(ng);
+    setCharName(player?.name || "");
+    setScreen("classSelect");
+    log(`\u{1F31F} New Game+ (cycle ${ng}) \u2014 enemies are ${10 + ng * 10}% stronger!`, "system");
+  } }, "\u{1F31F} New Game+ (Cycle ", ngPlus + 1, ")")));
   if (!player || !dun) return null;
   const vr = player.vr + player.torchB;
   const viewDX = viewDX0;
@@ -2612,8 +3318,9 @@ function Game() {
       } else if (enemy && vis && inFov) row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 3, color: enemy.isChampion ? "#fa0" : "#f44", textShadow: enemy.isChampion ? "0 0 6px #fa08, 0 0 12px #fa04" : "0 0 4px #f006" } }, enemy.icon));
       else if (isMini && vis && inFov) row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 1, color: "#d4f", textShadow: "0 0 8px #d4f8", animation: "glow 1.2s infinite" } }, "\u{1F479}"));
       else if (isBoss && vis && inFov) row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 1, color: player.floor % 10 === 0 ? "#f26" : "#f64", textShadow: `0 0 8px ${player.floor % 10 === 0 ? "#f268" : "#f648"}`, animation: "glow 1.2s infinite" } }, player.floor % 10 === 0 ? "\u{1F451}" : "\u{1F479}"));
-      else if (dc && vis && inFov && (dc.type === "obj" || dc.type === "center")) row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 2, opacity: s.o, lineHeight: 1 } }, dc.icon));
+      else if (dc && vis && inFov && (dc.type === "obj" || dc.type === "center" || dc.type === "pillar")) row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 2, opacity: s.o, lineHeight: 1 } }, dc.icon));
       else if (dc && vis && inFov && dc.type === "feature") row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 2, opacity: s.o, lineHeight: 1, textShadow: "0 0 4px #d4a84366" } }, dc.icon));
+      else if (dc && vis && inFov && dc.type === "theme") row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 3, opacity: s.o * 0.6, lineHeight: 1 } }, dc.icon));
       else if (dc && vis && inFov && dc.type === "torch") row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 3, opacity: s.o, lineHeight: 1, animation: "torchFlicker 1.2s infinite" } }, dc.icon));
       else if (dc && vis && inFov && dc.type === "corridor" && dc.icon !== "\xB7") row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts - 4, opacity: s.o * 0.4, lineHeight: 1 } }, dc.icon));
       else if (dc && dc.type === "scatter" && vis && inFov && dc.icon !== "\xB7") row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts, color: s.color, opacity: s.o * 0.5, textShadow: s.g, lineHeight: 1, fontFamily: "'JetBrains Mono',monospace", position: "relative" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: ts - 4, position: "absolute", top: 0, left: 0, right: 0, opacity: 0.3 } }, dc.icon), s.ch));
@@ -2621,16 +3328,102 @@ function Game() {
         const tAnim = tile === T.LAVA ? "lavaPulse 2s infinite" : tile === T.WATER ? "waterShimmer 3s infinite" : tile === T.VOID && inFov ? "voidRotate 8s linear infinite" : void 0;
         const trailIdx = trailSet.map.get(`${mx},${my}`);
         const hasTrail = trailIdx !== void 0 && vis && inFov && tile === T.FLOOR && !isP;
-        row.push(/* @__PURE__ */ React.createElement("td", { key: dx, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts, color: hasTrail ? fc.accent + "44" : s.color, opacity: s.o, textShadow: s.g, lineHeight: 1, fontFamily: "'JetBrains Mono',monospace", animation: tAnim, position: hasTrail ? "relative" : void 0 } }, hasTrail ? "\xB7" : s.ch));
+        const tTitle = isDesk && inFov ? { [T.STAIRS]: "Stairs", [T.CHEST]: "Chest", [T.FOUNTAIN]: "Fountain", [T.SHOP]: "Shop", [T.PORTAL]: "Portal", [T.BARRIER]: "Barrier", [T.FEATURE]: "Feature", [T.LORE]: "Lore", [T.NPC]: "NPC", [T.ECHO]: "Echo", [T.LOCKED]: "Locked", [T.CRACKED]: "Cracked wall", [T.TRAP]: "Trap", [T.PIT]: "Pit", [T.FIRE]: "Fire", [T.LAVA]: "Lava", [T.ICE]: "Ice", [T.WATER]: "Water", [T.VOID]: "Void" }[tile] : void 0;
+        row.push(/* @__PURE__ */ React.createElement("td", { key: dx, title: tTitle, style: { width: ts + 2, height: ts + 2, textAlign: "center", verticalAlign: "middle", padding: 0, fontSize: ts, color: hasTrail ? fc.accent + "44" : s.color, opacity: s.o, textShadow: s.g, lineHeight: 1, fontFamily: "'JetBrains Mono',monospace", animation: tAnim, position: hasTrail ? "relative" : void 0 } }, hasTrail ? "\xB7" : s.ch));
       }
     }
     mapRows.push(/* @__PURE__ */ React.createElement("tr", { key: dy }, row));
   }
-  return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000", position: "relative", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, bottom: 0, left: "env(safe-area-inset-left,0px)", right: "env(safe-area-inset-right,0px)", overflow: "hidden", background: fc.bg, color: "#c8c8d0", fontFamily: "'JetBrains Mono',monospace" } }, /* @__PURE__ */ React.createElement("style", null, `:root{--ac:${fc.accent};}`), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", animation: shaking ? "shake .2s" : inSanc ? "sancP 4s infinite" : "none" } }, /* @__PURE__ */ React.createElement("table", { key: `${player.x},${player.y}`, style: { borderCollapse: "collapse", animation: "fadeUp .06s ease" } }, /* @__PURE__ */ React.createElement("tbody", null, mapRows))), vfx.flash && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none", animation: "dmgFlash .3s forwards", background: vfx.flash === "damage" ? "rgba(255,40,40,.15)" : vfx.flash === "heal" ? "rgba(40,255,100,.12)" : "rgba(255,200,40,.12)" } }), vfx.particles.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 4, pointerEvents: "none" } }, vfx.particles.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { position: "absolute", width: 6, height: 6, borderRadius: "50%", background: p.color, boxShadow: `0 0 4px ${p.color}`, animation: `particle ${p.dur}s ease-out forwards`, "--px": `${p.px}px`, "--py": `${p.py}px` } }))), floatNums.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 5, pointerEvents: "none" } }, floatNums.map((f) => /* @__PURE__ */ React.createElement("div", { key: f.id, style: { position: "absolute", fontSize: 14, fontWeight: "bold", color: f.color, fontFamily: "'JetBrains Mono',monospace", textShadow: "0 1px 4px #000", animation: "floatUp 1s ease-out forwards", whiteSpace: "nowrap" } }, f.text))), weatherParts.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none", overflow: "hidden" } }, weatherParts.map((p) => {
+  return /* @__PURE__ */ React.createElement("div", { style: { width: "100vw", height: "100dvh", overflow: "hidden", background: "#000", position: "relative", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, bottom: 0, left: "env(safe-area-inset-left,0px)", right: "env(safe-area-inset-right,0px)", overflow: "hidden", background: fc.bg, color: "#c8c8d0", fontFamily: "'JetBrains Mono',monospace", filter: settings.colorblind ? "contrast(1.3) saturate(1.4)" : "none" } }, /* @__PURE__ */ React.createElement("style", null, `:root{--ac:${fc.accent};}`), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", animation: shaking ? "shake .2s" : inSanc ? "sancP 4s infinite" : "none" },
+      onTouchStart: (e) => {
+        if (combat || menu || shop || moralChoice) return;
+        const t = e.touches[0];
+        touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+      },
+      onTouchEnd: (e) => {
+        if (!touchStart.current || combat || menu || shop || moralChoice) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touchStart.current.x, dy = t.clientY - touchStart.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const elapsed = Date.now() - touchStart.current.time;
+        touchStart.current = null;
+        if (dist < 30 || elapsed > 500) return;
+        if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1, 0);
+        else move(0, dy > 0 ? 1 : -1);
+      }
+    },
+    /* @__PURE__ */ React.createElement("table", { key: `${player.x},${player.y}`, style: { borderCollapse: "collapse", animation: "fadeUp .06s ease" }, onClick: (e) => {
+      if (combat || menu || shop || moralChoice) return;
+      const td = e.target.closest("td");
+      if (!td) return;
+      const tr = td.parentNode;
+      const table = tr.parentNode;
+      const ci = Array.from(tr.children).indexOf(td);
+      const ri = Array.from(table.children).indexOf(tr);
+      const halfW = Math.floor((player.vr + player.torchB) * 2 + 1) / 2;
+      const halfH = halfW;
+      const dx2 = ci - Math.floor(halfW);
+      const dy2 = ri - Math.floor(halfH);
+      if (dx2 === 0 && dy2 === 0) return;
+      if (Math.abs(dx2) >= Math.abs(dy2)) move(dx2 > 0 ? 1 : -1, 0);
+      else move(0, dy2 > 0 ? 1 : -1);
+    } }, /* @__PURE__ */ React.createElement("tbody", null, mapRows))
+  ), vfx.flash && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none", animation: "dmgFlash .3s forwards", background: vfx.flash === "damage" ? "rgba(255,40,40,.15)" : vfx.flash === "heal" ? "rgba(40,255,100,.12)" : "rgba(255,200,40,.12)" } }), vfx.particles.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 4, pointerEvents: "none" } }, vfx.particles.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { position: "absolute", width: 6, height: 6, borderRadius: "50%", background: p.color, boxShadow: `0 0 4px ${p.color}`, animation: `particle ${p.dur}s ease-out forwards`, "--px": `${p.px}px`, "--py": `${p.py}px` } }))), floatNums.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", zIndex: 5, pointerEvents: "none" } }, floatNums.map((f) => /* @__PURE__ */ React.createElement("div", { key: f.id, style: { position: "absolute", fontSize: 14, fontWeight: "bold", color: f.color, fontFamily: "'JetBrains Mono',monospace", textShadow: "0 1px 4px #000", animation: "floatUp 1s ease-out forwards", whiteSpace: "nowrap" } }, f.text))), weatherParts.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none", overflow: "hidden" } }, weatherParts.map((p) => {
     const ti = Math.min(getTier(player.floor) - 1, 9);
     const w = BIOME_WEATHER[ti];
     return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { position: "absolute", left: `${p.x}%`, top: `${p.y}%`, width: p.sz, height: p.sz, borderRadius: "50%", background: w.color, animation: `${p.anim} ${p.dur}s ${p.delay}s linear infinite` } });
-  })), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 12 : 4, left: isDesk ? 12 : 4, zIndex: 10, display: "flex", alignItems: "center", gap: isDesk ? 8 : 5, pointerEvents: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: isDesk ? Math.round(10 * uiS) : 8, color: fc.accent, textShadow: `0 0 6px ${fc.accent}44` } }, fc.icon, " F", player.floor), /* @__PURE__ */ React.createElement("div", { style: { width: isDesk ? Math.round(110 * uiS) : 90 } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.hp, max: player.maxHp, color: "#c33", h: isDesk ? Math.round(11 * uiS) : 8 })), player.mp < player.maxMp && /* @__PURE__ */ React.createElement("div", { style: { width: isDesk ? Math.round(80 * uiS) : 60 } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.mp, max: player.maxMp, color: "#36c", h: isDesk ? Math.round(9 * uiS) : 6 })), /* @__PURE__ */ React.createElement("span", { style: { fontSize: isDesk ? Math.round(9 * uiS) : 7, color: "#555" } }, "Lv", player.level)), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, right: isDesk ? 16 : 6, zIndex: 20, display: "flex", flexDirection: "column", gap: isDesk ? 6 : 4, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMenu((m) => m ? null : "open"), style: { width: isDesk ? Math.round(40 * uiS) : 42, height: isDesk ? Math.round(40 * uiS) : 42, borderRadius: 10, background: "rgba(14,14,22,.65)", border: `1px solid ${fc.accent}33`, color: menu ? fc.accent : "#888", fontSize: isDesk ? Math.round(18 * uiS) : 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)", touchAction: "manipulation", position: "relative" } }, menu ? "\u2715" : "\u2630", hasRec && !menu && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#4c6", animation: "recB 1.5s infinite" } })), menu === "open" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: isDesk ? 5 : 3, animation: "fadeUp .15s" } }, [["stats", "\u{1F4CA} Stats"], ["inv", "\u{1F392} Inventory"], ["armory", "\u{1F3DB}\uFE0F Armory"], ["obj", "\u{1F4DC} Quests"], ["guide", "\u{1F4D6} Guide"], ["log", "\u{1F4CB} Event Log"], ["settings", "\u2699\uFE0F Settings"]].map(([k, lb]) => /* @__PURE__ */ React.createElement("button", { key: k, onClick: () => setMenu(k), style: { padding: isDesk ? `${Math.round(10 * uiS)}px ${Math.round(16 * uiS)}px` : "8px 14px", borderRadius: 8, background: "rgba(14,14,22,.8)", border: "1px solid #2a2a3a", color: "#aaa", fontSize: isDesk ? Math.round(12 * uiS) : 11, cursor: "pointer", backdropFilter: "blur(6px)", textAlign: "left", fontFamily: "'JetBrains Mono',monospace", touchAction: "manipulation", whiteSpace: "nowrap" } }, lb)))), settings.minimap && !menu && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? Math.round(56 * uiS) : 48, right: isDesk ? 16 : 6, zIndex: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: MW * mmS + 2, height: MH * mmS + 2, background: "rgba(6,6,12,.55)", border: `1px solid ${fc.wall}33`, borderRadius: 4, overflow: "hidden", position: "relative" } }, miniDots)), inSanc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(30,60,80,.35)", border: "1px solid #48a3", borderRadius: 8, fontSize: 9, color: "#6bd", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F3D5}\uFE0F SANCTUARY"), subArea && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(80,30,80,.35)", border: "1px solid #d4f3", borderRadius: 8, fontSize: 9, color: "#d8f", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F52E} ", dun?.fc?.name || "Hidden Area"), !inSanc && !subArea && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 10px", background: `rgba(20,20,30,.4)`, border: `1px solid ${fc.accent}22`, borderRadius: 8, fontSize: 9, color: bossAlive ? "#d46" : fc.accent, zIndex: 10, backdropFilter: "blur(4px)" } }, bossAlive ? player.floor % 10 === 0 ? "\u{1F451} " : "\u{1F479} " : fc.icon + " ", fc.name), floorTrans && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.8)", animation: "fadeUp .3s ease", pointerEvents: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 36 } }, floorTrans.icon), floorTrans.tierName && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#d4a843", letterSpacing: 4, fontFamily: "'Cinzel',serif", marginTop: 12, textTransform: "uppercase" } }, floorTrans.tierName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: floorTrans.tierName ? "#fff" : "#d4a843", letterSpacing: 3, fontFamily: "'Cinzel',serif", marginTop: floorTrans.tierName ? 4 : 8 } }, "Floor ", floorTrans.floor), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888", marginTop: 4, fontFamily: "'JetBrains Mono',monospace" } }, floorTrans.name), floorTrans.intro && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#999", marginTop: 12, fontStyle: "italic", textAlign: "center", maxWidth: 320, lineHeight: 1.6, fontFamily: "'Cinzel',serif" } }, '"', floorTrans.intro, '"'), floorTrans.floor % 10 === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#f44", letterSpacing: 3, marginTop: 10, animation: "glow 1s infinite" } }, "\u26A0\uFE0F MEGA BOSS AWAITS")), /* @__PURE__ */ React.createElement("div", { ref: logRef, className: "scr", style: { position: "absolute", bottom: isDesk ? 16 : 140, left: isDesk ? 16 : 6, maxWidth: isDesk ? Math.round(280 * uiS) : 180, maxHeight: isDesk ? Math.round(50 * uiS) : 32, overflowY: "auto", zIndex: 8, pointerEvents: "none" } }, eLog.slice(isDesk ? -5 : -3).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: isDesk ? Math.round(10 * uiS) : 7, color: logCol(e.ty), opacity: i === Math.min(eLog.length - 1, isDesk ? 4 : 2) ? 1 : 0.4, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 4px #000" } }, e.m))), !isDesk && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, right: 6, zIndex: 15 } }, /* @__PURE__ */ React.createElement(DPad, { accent: fc.accent, onDir: move, combatActive: !!combat || !!shop || !!menu || !!floorTrans })), menu && menu !== "open" && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)" }, onClick: () => setMenu(null) }, /* @__PURE__ */ React.createElement("div", { className: "scr", style: { width: isDesk ? 440 : Math.min(360, winSize.w - 32), maxHeight: isDesk ? "85vh" : "80vh", background: "rgba(12,12,20,.97)", border: `1px solid ${fc.accent}22`, borderRadius: 14, overflowY: "auto", padding: isDesk ? "24px 22px" : "18px 14px", animation: "fadeUp .2s ease", boxShadow: `0 8px 40px rgba(0,0,0,.6), 0 0 20px ${fc.accent}08` }, onClick: (e) => e.stopPropagation() }, menu === "stats" && (() => {
+  })), moralChoice && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.7)", backdropFilter: "blur(2px)" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#111119", border: "1px solid #d4a84344", borderRadius: 12, padding: 20, maxWidth: 300, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#d4a843", marginBottom: 12, fontStyle: "italic", lineHeight: 1.6 } }, moralChoice.prompt), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, [moralChoice.a, moralChoice.b].map((opt, i) => /* @__PURE__ */ React.createElement("button", { key: i, style: { ...btnS, flex: 1, padding: "10px 8px", fontSize: 11, color: i === 0 ? "#4c8" : "#c84", borderColor: i === 0 ? "#4c86" : "#c846" }, onClick: () => {
+    log(`\u2696\uFE0F ${opt.msg}`, "lore");
+    if (opt.eff === "xp") setPlayer((p) => ({ ...p, xp: p.xp + opt.amt }));
+    else if (opt.eff === "gold") setPlayer((p) => ({ ...p, gold: p.gold + opt.amt }));
+    else if (opt.eff === "hp") setPlayer((p) => ({ ...p, hp: p.maxHp, mp: p.maxMp }));
+    else if (opt.eff === "str") setPlayer((p) => ({ ...p, str: p.str + opt.amt }));
+    else if (opt.eff === "def") setPlayer((p) => ({ ...p, baseDef: p.baseDef + opt.amt }));
+    else if (opt.eff === "loot") {
+      const g = rng(20 + player.floor * 3, 60 + player.floor * 5);
+      setPlayer((p) => ({ ...p, gold: p.gold + g }));
+      showFloat(`+${g}g`, "#d4a843");
+    } else if (opt.eff === "risk") {
+      const d = rng(5, Math.floor(player.maxHp * 0.2));
+      setPlayer((p) => ({ ...p, hp: Math.max(1, p.hp - d), str: p.str + 1 }));
+      log(`-${d} HP but +1 STR`, "danger");
+    } else if (opt.eff === "sacrifice") {
+      const d = Math.floor(player.maxHp * 0.15);
+      setPlayer((p) => ({ ...p, hp: Math.max(1, p.hp - d), int: p.int + 2 }));
+      log(`-${d} HP but +2 INT`, "danger");
+    } else if (opt.eff === "safe") log("Wisdom in caution.", "system");
+    SFX.questComplete();
+    setMoralChoice(null);
+  } }, opt.label))))), !specialization && player.level >= 15 && SPECIALIZATIONS[player.cls] && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.7)", backdropFilter: "blur(2px)" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#111119", border: "1px solid #fa06", borderRadius: 12, padding: 20, maxWidth: 320, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#fa0", letterSpacing: 2, marginBottom: 4, fontFamily: "'Cinzel',serif" } }, "SPECIALIZE"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#888", marginBottom: 12 } }, "Choose your path at Level 15"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, SPECIALIZATIONS[player.cls].map((sp) => /* @__PURE__ */ React.createElement("button", { key: sp.name, style: { ...btnS, flex: 1, padding: "12px 8px", fontSize: 11, color: "#fa0", borderColor: "#fa06", textAlign: "center" }, onClick: () => {
+    setSpecialization(sp);
+    if (sp.eff === "berserker") setPlayer((p) => ({ ...p, str: p.str + Math.floor(p.str * 0.2) }));
+    else if (sp.eff === "guardian") setPlayer((p) => ({ ...p, baseDef: p.baseDef + Math.floor(p.baseDef * 0.2), maxHp: p.maxHp + 50, hp: p.hp + 50 }));
+    else if (sp.eff === "elementalist") setPlayer((p) => ({ ...p, int: p.int + Math.floor(p.int * 0.25) }));
+    else if (sp.eff === "arcanist") setPlayer((p) => ({ ...p, baseMaxMp: p.baseMaxMp + 40, maxMp: p.maxMp + 40, mp: p.mp + 40 }));
+    else if (sp.eff === "assassin") setPlayer((p) => ({ ...p, dex: p.dex + Math.floor(p.dex * 0.15), str: p.str + 3 }));
+    else if (sp.eff === "shadow") setPlayer((p) => ({ ...p, dex: p.dex + Math.floor(p.dex * 0.25), vr: p.vr + 3 }));
+    log(`\u{1F31F} Specialized: ${sp.name}! ${sp.desc}`, "levelup");
+    SFX.levelUp();
+  } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: "bold" } }, sp.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#888", marginTop: 4 } }, sp.desc)))))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 12 : 4, left: isDesk ? 12 : 4, zIndex: 10, display: "flex", alignItems: "center", gap: isDesk ? 8 : 5, pointerEvents: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: isDesk ? Math.round(10 * uiS) : 8, color: fc.accent, textShadow: `0 0 6px ${fc.accent}44` } }, fc.icon, " F", player.floor), /* @__PURE__ */ React.createElement("div", { style: { width: isDesk ? Math.round(110 * uiS) : 90 } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.hp, max: player.maxHp, color: "#c33", h: isDesk ? Math.round(11 * uiS) : 8 })), player.mp < player.maxMp && /* @__PURE__ */ React.createElement("div", { style: { width: isDesk ? Math.round(80 * uiS) : 60 } }, /* @__PURE__ */ React.createElement(Bar, { cur: player.mp, max: player.maxMp, color: "#36c", h: isDesk ? Math.round(9 * uiS) : 6 })), /* @__PURE__ */ React.createElement("span", { style: { fontSize: isDesk ? Math.round(9 * uiS) : 7, color: "#555" } }, "Lv", player.level)), isDesk && dun && !combat && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 16, left: 16, zIndex: 8, fontSize: 9, color: "#444", pointerEvents: "none" } }, (() => {
+    let total = 0, seen = 0;
+    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+      if (dun.map[y][x] !== T.WALL) {
+        total++;
+        if (dun.revealed[y] && dun.revealed[y][x]) seen++;
+      }
+    }
+    return `Explored: ${total > 0 ? Math.round(seen / total * 100) : 0}%`;
+  })()), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? 16 : 6, right: isDesk ? 16 : 6, zIndex: 20 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMenu((m) => m ? null : "stats"), style: { width: isDesk ? Math.round(40 * uiS) : 42, height: isDesk ? Math.round(40 * uiS) : 42, borderRadius: 10, background: "rgba(14,14,22,.65)", border: `1px solid ${fc.accent}33`, color: menu ? fc.accent : "#888", fontSize: isDesk ? Math.round(18 * uiS) : 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)", touchAction: "manipulation", position: "relative" } }, menu ? "\u2715" : "\u2630", hasRec && !menu && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#4c6", animation: "recB 1.5s infinite" } }))), settings.minimap && !menu && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: isDesk ? Math.round(56 * uiS) : 48, right: isDesk ? 16 : 6, zIndex: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: MW * mmS + 2, height: MH * mmS + 2, background: "rgba(6,6,12,.55)", border: `1px solid ${fc.wall}33`, borderRadius: 4, overflow: "hidden", position: "relative" } }, miniDots)), inSanc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(30,60,80,.35)", border: "1px solid #48a3", borderRadius: 8, fontSize: 9, color: "#6bd", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F3D5}\uFE0F SANCTUARY"), subArea && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", background: "rgba(80,30,80,.35)", border: "1px solid #d4f3", borderRadius: 8, fontSize: 9, color: "#d8f", zIndex: 10, backdropFilter: "blur(4px)" } }, "\u{1F52E} ", dun?.fc?.name || "Hidden Area"), !inSanc && !subArea && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", padding: "3px 10px", background: `rgba(20,20,30,.4)`, border: `1px solid ${fc.accent}22`, borderRadius: 8, fontSize: 9, color: bossAlive ? "#d46" : fc.accent, zIndex: 10, backdropFilter: "blur(4px)" } }, bossAlive ? player.floor % 10 === 0 ? "\u{1F451} " : "\u{1F479} " : fc.icon + " ", fc.name), floorTrans && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.8)", animation: "fadeUp .3s ease", pointerEvents: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 36 } }, floorTrans.icon), floorTrans.tierName && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#d4a843", letterSpacing: 4, fontFamily: "'Cinzel',serif", marginTop: 12, textTransform: "uppercase" } }, floorTrans.tierName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: floorTrans.tierName ? "#fff" : "#d4a843", letterSpacing: 3, fontFamily: "'Cinzel',serif", marginTop: floorTrans.tierName ? 4 : 8 } }, "Floor ", floorTrans.floor), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888", marginTop: 4, fontFamily: "'JetBrains Mono',monospace" } }, floorTrans.name), floorTrans.intro && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#999", marginTop: 12, fontStyle: "italic", textAlign: "center", maxWidth: 320, lineHeight: 1.6, fontFamily: "'Cinzel',serif" } }, '"', floorTrans.intro, '"'), floorTrans.floor % 10 === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#f44", letterSpacing: 3, marginTop: 10, animation: "glow 1s infinite" } }, "\u26A0\uFE0F MEGA BOSS AWAITS")), /* @__PURE__ */ React.createElement("div", { ref: logRef, className: "scr", style: { position: "absolute", bottom: isDesk ? 16 : 140, left: isDesk ? 16 : 6, maxWidth: isDesk ? Math.round(280 * uiS) : 180, maxHeight: isDesk ? Math.round(50 * uiS) : 32, overflowY: "auto", zIndex: 8, pointerEvents: "none" } }, eLog.slice(isDesk ? -5 : -3).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: isDesk ? Math.round(10 * uiS) : 7, color: logCol(e.ty), opacity: i === Math.min(eLog.length - 1, isDesk ? 4 : 2) ? 1 : 0.4, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 4px #000" } }, e.m))), !isDesk && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, right: 6, zIndex: 15 } }, /* @__PURE__ */ React.createElement(DPad, { accent: fc.accent, onDir: move, combatActive: !!combat || !!shop || !!menu || !!floorTrans })), !combat && !menu && !shop && (() => {
+    const hpPot = player.inv.find((i) => i.effect === "hp");
+    const mpPot = player.inv.find((i) => i.effect === "mp");
+    const hpCount = player.inv.filter((i) => i.effect === "hp").length;
+    const mpCount = player.inv.filter((i) => i.effect === "mp").length;
+    if (!hpPot && !mpPot) return null;
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: isDesk ? 16 : 140, right: isDesk ? 16 : 6, zIndex: 12, display: "flex", gap: 4 } }, hpPot && /* @__PURE__ */ React.createElement("button", { style: { width: 36, height: 36, borderRadius: 8, background: "rgba(14,14,22,.7)", border: "1px solid #c3344", color: "#c33", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", backdropFilter: "blur(2px)" }, onClick: () => useItem(hpPot, false) }, "\u2764\uFE0F", /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", bottom: -2, right: -2, fontSize: 8, color: "#888", background: "#111", borderRadius: 4, padding: "0 3px" } }, hpCount)), mpPot && /* @__PURE__ */ React.createElement("button", { style: { width: 36, height: 36, borderRadius: 8, background: "rgba(14,14,22,.7)", border: "1px solid #36c4", color: "#36c", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", backdropFilter: "blur(2px)" }, onClick: () => useItem(mpPot, false) }, "\u{1F499}", /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", bottom: -2, right: -2, fontSize: 8, color: "#888", background: "#111", borderRadius: 4, padding: "0 3px" } }, mpCount)));
+  })(), menu && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", background: "#060810", animation: "fadeUp .15s" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, borderBottom: `1px solid ${fc.accent}22`, background: "rgba(12,12,20,.98)", overflowX: "auto", flexShrink: 0 }, className: "scr" }, [["stats", "\u{1F4CA}"], ["inv", "\u{1F392}"], ["armory", "\u{1F3DB}\uFE0F"], ["obj", "\u{1F4DC}"], ["guide", "\u{1F4D6}"], ["lorelog", "\u{1F4DC}"], ["bestiary", "\u{1F4D5}"], ["achieve", "\u{1F3C6}"], ["log", "\u{1F4CB}"], ["settings", "\u2699\uFE0F"]].map(([k, icon]) => /* @__PURE__ */ React.createElement("button", { key: k, onClick: () => setMenu(k), style: { padding: isDesk ? "10px 16px" : "8px 10px", background: menu === k ? `${fc.accent}15` : "transparent", borderBottom: menu === k ? `2px solid ${fc.accent}` : "2px solid transparent", color: menu === k ? fc.accent : "#555", fontSize: isDesk ? 14 : 16, cursor: "pointer", border: "none", outline: "none", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap", flexShrink: 0 } }, icon)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setMenu(null), style: { padding: "8px 14px", background: "transparent", border: "none", color: "#888", fontSize: 18, cursor: "pointer" } }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "scr", style: { flex: 1, overflowY: "auto", padding: isDesk ? "24px 28px" : "16px 14px" }, onClick: (e) => e.stopPropagation() }, menu === "stats" && (() => {
     const eqW = player.equipped.weapon;
     const eqA = player.equipped.armor;
     const pct = Math.round(player.xp / xpFor(player.level) * 100);
@@ -2638,7 +3431,33 @@ function Game() {
       const unlockLvls = [1, 4, 8, 14, 22];
       const si = player.skills.indexOf(s);
       return /* @__PURE__ */ React.createElement("span", { key: s, style: { padding: "4px 10px", background: "#0c0c16", border: "1px solid #1e1e2e", borderRadius: 6, fontSize: 10, color: "#333" } }, "\u{1F512} ", s, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#444" } }, "Lv", unlockLvls[si] || "?"));
-    })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "JOURNEY"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 14px", fontSize: 10 } }, [["Enemies slain", stats.kills], ["Chests opened", stats.chests], ["Steps walked", stats.steps], ["Mega bosses", stats.megaK], ["Total gold earned", stats.totG], ["Respawn point", lastSanc > 0 ? `F${lastSanc}` : "None"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between", padding: "3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#444" } }, l), /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, v)))));
+    })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "JOURNEY"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 14px", fontSize: 10 } }, [["Enemies slain", stats.kills], ["Chests opened", stats.chests], ["Steps walked", stats.steps], ["Mega bosses", stats.megaK], ["Total gold earned", stats.totG], ["Respawn point", lastSanc > 0 ? `F${lastSanc}` : "None"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between", padding: "3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#444" } }, l), /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, v)))), statPoints > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c4c", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #c4c2", paddingBottom: 4 } }, "ALLOCATE POINTS (", statPoints, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, [["STR", "str", "#d94"], ["DEX", "dex", "#4c8"], ["INT", "int", "#a8e"], ["DEF", "baseDef", "#8ac"]].map(([label, key, color]) => /* @__PURE__ */ React.createElement("button", { key, style: { ...btnS, fontSize: 10, padding: "6px 12px", color, borderColor: color + "66" }, onClick: () => {
+      setPlayer((p) => ({ ...p, [key]: p[key] + 1 }));
+      setStatPoints((sp) => sp - 1);
+      log(`+1 ${label}!`, "levelup");
+    } }, "+1 ", label)))), (() => {
+      const availablePerks = [];
+      for (let l = 10; l <= 50; l += 10) {
+        const pi = l / 10 - 1;
+        if (player.level >= l && pi < PERKS.length && !passives.some((p) => p.level === l)) availablePerks.push({ level: l, options: PERKS[pi] });
+      }
+      if (availablePerks.length === 0) return null;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, availablePerks.map((ap) => /* @__PURE__ */ React.createElement("div", { key: ap.level }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#fa0", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #fa02", paddingBottom: 4 } }, "\u{1F31F} PERK \u2014 Level ", ap.level), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, ap.options.map((opt) => /* @__PURE__ */ React.createElement("button", { key: opt.name, style: { ...btnS, flex: 1, fontSize: 10, padding: "8px 6px", color: "#fa0", borderColor: "#fa06", textAlign: "center" }, onClick: () => {
+        setPassives((p) => [...p, { ...opt, level: ap.level }]);
+        if (opt.eff === "str") setPlayer((p) => ({ ...p, str: p.str + opt.amt }));
+        else if (opt.eff === "dex") setPlayer((p) => ({ ...p, dex: p.dex + opt.amt }));
+        else if (opt.eff === "int") setPlayer((p) => ({ ...p, int: p.int + opt.amt }));
+        else if (opt.eff === "def") setPlayer((p) => ({ ...p, baseDef: p.baseDef + opt.amt }));
+        else if (opt.eff === "mp") setPlayer((p) => ({ ...p, baseMaxMp: p.baseMaxMp + opt.amt, maxMp: p.maxMp + opt.amt, mp: p.mp + opt.amt }));
+        else if (opt.eff === "hp_pct") setPlayer((p) => {
+          const bonus = Math.floor(p.maxHp * opt.amt / 100);
+          return { ...p, maxHp: p.maxHp + bonus, hp: p.hp + bonus };
+        });
+        else if (opt.eff === "allstats") setPlayer((p) => ({ ...p, str: p.str + opt.amt, dex: p.dex + opt.amt, int: p.int + opt.amt, baseDef: p.baseDef + opt.amt }));
+        log(`\u{1F31F} Perk: ${opt.name}!`, "levelup");
+        SFX.levelUp();
+      } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: "bold" } }, opt.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#888", marginTop: 2 } }, opt.desc)))))));
+    })(), CLASSES[player.cls]?.passive && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#6a6a5a", marginTop: 14, fontStyle: "italic" } }, "\u{1F6E1}\uFE0F Passive: ", CLASSES[player.cls].passive), passives.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#fa0", letterSpacing: 2, marginTop: 10, marginBottom: 4 } }, "PERKS"), passives.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.level, style: { fontSize: 9, color: "#888", padding: "2px 0" } }, "Lv", p.level, ": ", p.name, " \u2014 ", p.desc))), player.equipped.accessory && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#0e0e1a", borderRadius: 6, border: "1px solid #1e1e2e", marginTop: 8, fontSize: 11 } }, /* @__PURE__ */ React.createElement("span", null, "\u{1F48D}"), /* @__PURE__ */ React.createElement("span", { style: { color: "#ddd", flex: 1 } }, player.equipped.accessory.icon, " ", player.equipped.accessory.name), /* @__PURE__ */ React.createElement("span", { style: { color: "#c9a84c", fontSize: 9 } }, player.equipped.accessory.desc || "")));
   })(), menu === "inv" && (() => {
     const cons = player.inv.filter((i) => i.type === "consumable");
     const stacks = {};
@@ -2649,12 +3468,14 @@ function Game() {
       stacks[k].ids.push(c.id);
     });
     const stackList = Object.values(stacks);
+    const sortOrder = { hp: 0, mp: 1, cure: 2, full: 3, revive: 4, damage: 5, vision: 6, speed: 7, shield: 8, warp: 9, key: 10, perm_str: 11, perm_dex: 12, perm_int: 13 };
+    stackList.sort((a, b) => (sortOrder[a.effect] ?? 99) - (sortOrder[b.effect] ?? 99));
     const totalSellVal = cons.reduce((s, c) => s + Math.floor(c.val / 2), 0);
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 10, fontFamily: "'Cinzel',serif" } }, "INVENTORY ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#666" } }, "(", cons.length, ")")), stackList.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, borderBottom: "1px solid #46c2", paddingBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#4a8", letterSpacing: 2 } }, "CONSUMABLES"), cons.length > 3 && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 8, padding: "2px 8px", color: "#d4a843", borderColor: "#d4a84344" }, onClick: () => {
       setPlayer((p) => ({ ...p, inv: p.inv.filter((i) => i.type !== "consumable"), gold: p.gold + totalSellVal }));
       SFX.sell();
       log(`Sold all consumables +${totalSellVal}g`, "info");
-    } }, "Sell All (", totalSellVal, "g)")), stackList.map((stack) => /* @__PURE__ */ React.createElement("div", { key: stack.name, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "#0c0c16", borderRadius: 8, border: "1px solid #1e1e2e", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, stack.icon, " ", stack.name), stack.count > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: fc.accent, marginLeft: 5, fontWeight: "bold" } }, "\xD7", stack.count), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, { hp: "Restores HP", mp: "Restores MP", cure: "Cures poison", vision: "Extends vision range", damage: "Deals damage in combat", full: "Full HP & MP restore", revive: "Auto-revive on death" }[stack.effect] || stack.effect, stack.amt > 0 ? ` (+${stack.amt})` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 10px", color: "#4a8" }, onClick: () => {
+    } }, "Sell All (", totalSellVal, "g)")), stackList.map((stack) => /* @__PURE__ */ React.createElement("div", { key: stack.name, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "#0c0c16", borderRadius: 8, border: "1px solid #1e1e2e", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, stack.icon, " ", stack.name), stack.count > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: fc.accent, marginLeft: 5, fontWeight: "bold" } }, "\xD7", stack.count), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, { hp: "Restores HP", mp: "Restores MP", cure: "Cures poison", vision: "Extends vision range", damage: "Deals damage in combat", full: "Full HP & MP restore", revive: "Auto-revive on death", speed: "Temporary +DEX", shield: "Temporary +DEF", warp: "Teleport to sanctuary", key: "Opens locked doors", perm_str: "+1 STR permanent", perm_dex: "+1 DEX permanent", perm_int: "+1 INT permanent" }[stack.effect] || stack.effect, stack.amt > 0 ? ` (+${stack.amt})` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 10px", color: "#4a8" }, onClick: () => {
       const item = player.inv.find((i) => i.name === stack.name);
       if (item) useItem(item);
     } }, "Use"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: "#d4a843" }, onClick: () => {
@@ -2685,7 +3506,26 @@ function Game() {
         return /* @__PURE__ */ React.createElement("div", { key: o.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", marginBottom: 2, borderRadius: 6, background: ok ? "rgba(68,204,102,.05)" : "transparent" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, width: 20, textAlign: "center" } }, ok ? "\u2705" : "\u2B1C"), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 11, color: ok ? "#4c6" : "#777", textDecoration: ok ? "line-through" : "none" } }, o.text), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: ok ? "#4c6" : "#444" } }, "+", o.xp, "xp"));
       }));
     }));
-  })(), menu === "log" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "EVENT LOG"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, eLog.length, " entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 1 } }, eLog.slice(-60).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 11, color: logCol(e.ty), padding: "3px 6px", borderRadius: 4, background: i % 2 === 0 ? "rgba(20,20,30,.3)" : "transparent", lineHeight: 1.5 } }, e.m))), eLog.length > 60 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 } }, "Showing last 60 entries")), menu === "armory" && (() => {
+  })(), menu === "lorelog" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#c9a84c", letterSpacing: 2, textAlign: "center", marginBottom: 10, fontFamily: "'Cinzel',serif" } }, "\u{1F4DC} LORE LOG"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, loreLog.length, "/30 entries discovered"), loreLog.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#444", textAlign: "center", padding: 20 } }, "No lore discovered yet. Look for \u{1F4DC} tiles on the map."), Array.from({ length: 10 }).map((_, ti) => {
+    const tierEntries = loreLog.filter((e) => e.tier === ti + 1);
+    if (tierEntries.length === 0) return null;
+    return /* @__PURE__ */ React.createElement("div", { key: ti, style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 3, marginBottom: 4 } }, "TIER ", ti + 1, " \u2014 ", tierEntries.length, "/3"), tierEntries.map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 10, color: "#999", fontStyle: "italic", padding: "4px 0", lineHeight: 1.5 } }, '"', e.text, '"')));
+  })), menu === "bestiary" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#f44", letterSpacing: 2, textAlign: "center", marginBottom: 10, fontFamily: "'Cinzel',serif" } }, "\u{1F4D5} BESTIARY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, "Enemies encountered: ", Object.keys(stats.seen || {}).length), Object.entries(stats.seen || {}).map(([name, data]) => /* @__PURE__ */ React.createElement("div", { key: name, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "rgba(20,20,30,.3)", borderRadius: 6, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16 } }, data.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#ccc" } }, name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666" } }, BESTIARY_FLAVOR[name] || "A denizen of the depths."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444" } }, "Killed: ", data.kills || 0)))), Object.keys(stats.seen || {}).length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#444", textAlign: "center", padding: 20 } }, "No enemies encountered yet.")), menu === "achieve" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#fa0", letterSpacing: 2, textAlign: "center", marginBottom: 10, fontFamily: "'Cinzel',serif" } }, "\u{1F3C6} ACHIEVEMENTS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 6 } }, achievements.length, "/", ACHIEVEMENTS.length, " unlocked"), ACHIEVEMENTS.map((a) => {
+    const done = achievements.includes(a.id);
+    return /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: done ? "rgba(30,30,10,.3)" : "rgba(20,20,30,.3)", borderRadius: 6, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14 } }, done ? "\u{1F3C6}" : "\u{1F512}"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: done ? "#fa0" : "#444" } }, a.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: done ? "#888" : "#333" } }, a.desc)));
+  }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "SESSION"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777" } }, "Time: ", Math.floor(gameTime / 3600), "h ", Math.floor(gameTime % 3600 / 60), "m ", gameTime % 60, "s"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777" } }, "Kill Streak: ", killStreak), ngPlus > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#fa0" } }, "NG+ Cycle: ", ngPlus, " (+", ngPlus * 10, "% enemy power)"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "MASTERY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777" } }, "Highest Floor: ", player.floor, "/100"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777" } }, "Tier ", getTier(player.floor), "/10 \u2014 ", Math.round(player.floor), "% complete"), bounty && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "BOUNTY"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#d4a843" } }, "Kill ", bounty.required, " ", bounty.target, "s \u2014 ", bounty.current, "/", bounty.required, " \u2014 Reward: ", bounty.reward, "g")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "RUN STATISTICS"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 14px", fontSize: 10 } }, [["DPS", computed ? Math.round(computed.atk * 1.2) : "?"], ["Gold/Floor", player.floor > 0 ? Math.round(stats.totG / player.floor) : 0], ["Kills/Floor", player.floor > 0 ? (stats.kills / player.floor).toFixed(1) : 0], ["Steps/Floor", player.floor > 0 ? Math.round(stats.steps / player.floor) : 0], ["Lore Found", loreLog.length + "/30"], ["Bestiary", Object.keys(stats.seen || {}).length + " types"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between", padding: "2px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#444" } }, l), /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, v)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", letterSpacing: 2, marginTop: 14, marginBottom: 6, borderBottom: "1px solid #2224", paddingBottom: 4 } }, "ACTIONS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, fontSize: 9, padding: "8px 4px", color: "#6be", borderColor: "#6be4", textAlign: "center" }, onClick: () => {
+    if (!dun) return;
+    setPlayer((p) => ({ ...p, x: dun.start.x, y: dun.start.y }));
+    setMenu(null);
+    SFX.portal();
+    log("\u{1F52E} Teleported to floor entrance.", "system");
+  } }, "\u{1F52E} Return to Start"), lastSanc > 0 && player.floor < lastSanc && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, fontSize: 9, padding: "8px 4px", color: "#d4a843", borderColor: "#d4a84344", textAlign: "center" }, onClick: () => {
+    setMenu(null);
+    enterSanctuary(lastSanc);
+    setPlayer((p) => ({ ...p, floor: lastSanc }));
+    SFX.portal();
+    log(`\u23ED\uFE0F Skipped to Sanctuary F${lastSanc}.`, "system");
+  } }, "\u23ED\uFE0F Skip to F", lastSanc))), menu === "log" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "EVENT LOG"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", textAlign: "center", marginBottom: 10 } }, eLog.length, " entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 1 } }, eLog.slice(-60).map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 11, color: logCol(e.ty), padding: "3px 6px", borderRadius: 4, background: i % 2 === 0 ? "rgba(20,20,30,.3)" : "transparent", lineHeight: 1.5 } }, e.m))), eLog.length > 60 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 } }, "Showing last 60 entries")), menu === "armory" && (() => {
     const eqW = player.equipped.weapon;
     const eqA = player.equipped.armor;
     const stacks = {};
@@ -2721,7 +3561,36 @@ function Game() {
       setPlayer((p) => ({ ...p, gold: p.gold + totalVal }));
       SFX.sell();
       log(`Sold all armory items +${totalVal}g`, "info");
-    } }, "Sell All (", totalVal, "g)")), weapons.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c64", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #c6422", paddingBottom: 4 } }, "WEAPONS (", weapons.length, ")"), weapons.map((s) => {
+    } }, "Sell All (", totalVal, "g)")), (eqW || eqA) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 8 } }, eqW && (() => {
+      const cost = Math.floor((eqW.val || 50) * 1.5);
+      return /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, fontSize: 9, padding: "6px 4px", color: "#c64", borderColor: "#c6444", textAlign: "center" }, onClick: () => {
+        if (player.gold < cost) {
+          log("Not enough gold!", "danger");
+          return;
+        }
+        setPlayer((p) => ({ ...p, gold: p.gold - cost, equipped: { ...p.equipped, weapon: { ...p.equipped.weapon, atk: p.equipped.weapon.atk + 2, val: (p.equipped.weapon.val || 50) + 20, name: p.equipped.weapon.name.replace(/\+\d+/, "") + ` +${(p.equipped.weapon.upgrades || 0) + 1}`, upgrades: (p.equipped.weapon.upgrades || 0) + 1 } } }));
+        SFX.equip();
+        log(`\u2B06\uFE0F Upgraded ${eqW.name}! +2 ATK`, "levelup");
+      } }, "\u2B06\uFE0F Upgrade Wpn (", cost, "g)");
+    })(), eqA && (() => {
+      const cost = Math.floor((eqA.val || 50) * 1.5);
+      return /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, fontSize: 9, padding: "6px 4px", color: "#68c", borderColor: "#68c4", textAlign: "center" }, onClick: () => {
+        if (player.gold < cost) {
+          log("Not enough gold!", "danger");
+          return;
+        }
+        setPlayer((p) => ({ ...p, gold: p.gold - cost, equipped: { ...p.equipped, armor: { ...p.equipped.armor, def: p.equipped.armor.def + 2, val: (p.equipped.armor.val || 50) + 20, name: p.equipped.armor.name.replace(/\+\d+/, "") + ` +${(p.equipped.armor.upgrades || 0) + 1}`, upgrades: (p.equipped.armor.upgrades || 0) + 1 } } }));
+        SFX.equip();
+        log(`\u2B06\uFE0F Upgraded ${eqA.name}! +2 DEF`, "levelup");
+      } }, "\u2B06\uFE0F Upgrade Arm (", cost, "g)");
+    })()), armory.length >= 3 && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, width: "100%", marginBottom: 8, padding: "8px 0", textAlign: "center", color: "#fa0", borderColor: "#fa04", fontSize: 10 }, onClick: () => {
+      const salvageVal = armory.reduce((s, i) => s + Math.floor((i.val || 10) * 0.4), 0);
+      const statGain = Math.floor(armory.length / 3);
+      setArmory([]);
+      setPlayer((p) => ({ ...p, gold: p.gold + salvageVal, str: p.str + statGain }));
+      SFX.sell();
+      log(`\u{1F528} Salvaged ${armory.length} items \u2192 ${salvageVal}g +${statGain} STR`, "loot");
+    } }, "\u{1F528} Salvage All \u2192 ~", Math.floor(armory.reduce((s, i) => s + (i.val || 10) * 0.4, 0)), "g +", Math.floor(armory.length / 3), " STR"), weapons.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c64", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #c6422", paddingBottom: 4 } }, "WEAPONS (", weapons.length, ")"), weapons.map((s) => {
       const isR = recW && s.name === recW.name;
       return /* @__PURE__ */ React.createElement("div", { key: s.name, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: isR ? "#0c1a0e" : "#0c0c16", borderRadius: 8, border: `1px solid ${isR ? "#4c63" : "#1e1e2e"}`, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: isR ? "#8d8" : "#ccc" } }, s.icon, " ", s.name), s.count > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "#c64", marginLeft: 5 } }, "\xD7", s.count), isR && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#4c6", marginLeft: 4 } }, "\u2B06\uFE0F"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, "+", s.atk, "ATK", s.intB ? ` +${s.intB}INT` : "", s.dexB ? ` +${s.dexB}DEX` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 9, padding: "3px 8px", color: isR ? "#4c6" : "#4a8", borderColor: isR ? "#4c64" : "#2a2a3a" }, onClick: () => {
         const item = armory.find((i) => i.name === s.name && i.type === "weapon");
@@ -2750,11 +3619,20 @@ function Game() {
         }
       } }, "Sell")));
     })), armory.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#333", textAlign: "center", padding: 20, fontSize: 12 } }, "Armory empty \u2014 boss drops & shop gear appear here"));
-  })(), menu === "guide" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "GUIDE"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "MAP LEGEND"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", marginBottom: 14 } }, [["#ffd700", "You (player)", "\u25CF"], ["#0d8", "\u25BC Stairs (exit)", "\u25BC"], ["#ea0", "\u25C6 Chest (loot)", "\u25C6"], ["#48f", "\u2666 Fountain (heal)", "\u2666"], ["#fa0", "$ Shop (buy/sell)", "$"], ["#d4f", "\u2295 Portal (sub-area)", "\u2295"], ["#f84", "\u2593 Barrier (fight)", "\u2593"], ["#d4a843", "\u2726 Feature (interact)", "\u2726"], ["#f44", "Enemy", "\u{1F47E}"], ["#fa0", "\u2605 Champion", "\u2605"], ["#555", "\u2588 Wall", "\u2588"], ["#500", "\u25CB Pit (damage)", "\u25CB"], ["#f40", "\u2248 Fire/Lava", "\u2248"], ["#8df", "\u25AA Ice (slip)", "\u25AA"], ["#26a", "~ Water (slow)", "~"], ["#84c", "\u221E Void (damage)", "\u221E"]].map(([c, l, ch]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", background: "#0c0c16", borderRadius: 5, border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("span", { style: { color: c, fontSize: 12, width: 14, textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, ch), /* @__PURE__ */ React.createElement("span", { style: { color: "#888", fontSize: 9 } }, l)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "WASD / Arrow keys \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, keybinds.inv.toUpperCase(), " \u2014 Inventory \xB7 ", keybinds.stats.toUpperCase(), " \u2014 Stats \xB7 ", keybinds.quests.toUpperCase(), " \u2014 Quests \xB7 ", keybinds.armory.toUpperCase(), " \u2014 Armory"), /* @__PURE__ */ React.createElement("div", null, "F9 \u2014 Quick save \xB7 Esc \u2014 Close menu"), /* @__PURE__ */ React.createElement("div", null, "Enter/Space \u2014 Confirm in combat")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "COMBAT TIPS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "DEF reduces damage by DEF/(DEF+ATK+40) \u2014 never fully blocks"), /* @__PURE__ */ React.createElement("div", null, "Poison ticks 2% max HP per turn in combat"), /* @__PURE__ */ React.createElement("div", null, "Flee chance: 40% base + DEX\xD70.5% \u2212 Floor\xD70.3% (max 75%)"), /* @__PURE__ */ React.createElement("div", null, "Shield Wall / Arcane Shield halves damage for 1 enemy turn"), /* @__PURE__ */ React.createElement("div", null, "Skills cost more MP on higher tiers (\xD71.0 to \xD71.9)"), /* @__PURE__ */ React.createElement("div", null, "Crits: 6% + DEX\xD71.5% chance, \xD71.9 damage")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "MECHANICS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "Boss gear goes to the Armory \u2014 equip from there"), /* @__PURE__ */ React.createElement("div", null, "Every 10th floor has a Mega Boss + Sanctuary after"), /* @__PURE__ */ React.createElement("div", null, "Portals \u2295 lead to hidden sub-areas (vault, boss, gauntlet)"), /* @__PURE__ */ React.createElement("div", null, "Sanctuaries have shops, fountains, and respawn points"), /* @__PURE__ */ React.createElement("div", null, "Death returns you to last sanctuary (\u221225% gold, \u221230% XP)"), /* @__PURE__ */ React.createElement("div", null, "Secret walls \u2588 reveal near INT-based characters"), /* @__PURE__ */ React.createElement("div", null, "\u2605 Champions: rare enemies with 1.5\xD7 stats, 2\xD7 rewards")), player && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "CLASS: ", player.cls.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } }, player.skills.map((s, i) => {
+  })(), menu === "guide" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "GUIDE"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "MAP LEGEND"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", marginBottom: 14 } }, [["#ffd700", "You (player)", "\u25CF"], ["#0d8", "\u25BC Stairs (exit)", "\u25BC"], ["#ea0", "\u25C6 Chest (loot)", "\u25C6"], ["#48f", "\u2666 Fountain (heal)", "\u2666"], ["#fa0", "$ Shop (buy/sell)", "$"], ["#d4f", "\u2295 Portal (sub-area)", "\u2295"], ["#f84", "\u2593 Barrier (fight)", "\u2593"], ["#d4a843", "\u2726 Feature (interact)", "\u2726"], ["#c9a84c", "\u{1F4DC} Lore (story)", "\u{1F4DC}"], ["#8cf", "\u{1F9D9} NPC (talk)", "\u{1F9D9}"], ["#ffd700", "\u{1F4AC} Echo (F91-99)", "\u{1F4AC}"], ["#fa0", "\u{1F512} Locked door (key)", "\u{1F512}"], ["#887755", "\u2592 Cracked wall (STR)", "\u2592"], ["#f44", "Enemy", "\u{1F47E}"], ["#fa0", "\u2605 Champion", "\u2605"], ["#555", "\u2588 Wall", "\u2588"], ["#500", "\u25CB Pit (damage)", "\u25CB"], ["#f40", "\u2248 Fire/Lava", "\u2248"], ["#8df", "\u25AA Ice (slip)", "\u25AA"], ["#26a", "~ Water (slow)", "~"], ["#84c", "\u221E Void (damage)", "\u221E"]].map(([c, l, ch]) => /* @__PURE__ */ React.createElement("div", { key: l, style: { display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", background: "#0c0c16", borderRadius: 5, border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("span", { style: { color: c, fontSize: 12, width: 14, textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, ch), /* @__PURE__ */ React.createElement("span", { style: { color: "#888", fontSize: 9 } }, l)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "WASD / Arrow keys \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, keybinds.inv.toUpperCase(), " \u2014 Inventory \xB7 ", keybinds.stats.toUpperCase(), " \u2014 Stats \xB7 ", keybinds.quests.toUpperCase(), " \u2014 Quests \xB7 ", keybinds.armory.toUpperCase(), " \u2014 Armory"), /* @__PURE__ */ React.createElement("div", null, "F9 \u2014 Quick save \xB7 Esc \u2014 Close menu"), /* @__PURE__ */ React.createElement("div", null, "Enter/Space \u2014 Confirm in combat")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "COMBAT TIPS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "DEF reduces damage by DEF/(DEF+ATK+40) \u2014 never fully blocks"), /* @__PURE__ */ React.createElement("div", null, "Poison ticks 2% max HP per turn in combat"), /* @__PURE__ */ React.createElement("div", null, "Flee chance: 40% base + DEX\xD70.5% \u2212 Floor\xD70.3% (max 75%)"), /* @__PURE__ */ React.createElement("div", null, "Shield Wall / Arcane Shield halves damage for 1 enemy turn"), /* @__PURE__ */ React.createElement("div", null, "Skills cost more MP on higher tiers (\xD71.0 to \xD71.9)"), /* @__PURE__ */ React.createElement("div", null, "Crits: 6% + DEX\xD71.5% chance, \xD71.9 damage")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "MECHANICS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#777", lineHeight: 1.8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, "Boss gear goes to the Armory \u2014 equip from there"), /* @__PURE__ */ React.createElement("div", null, "Every 10th floor has a Mega Boss + Sanctuary after"), /* @__PURE__ */ React.createElement("div", null, "Portals \u2295 lead to hidden sub-areas (vault, boss, gauntlet)"), /* @__PURE__ */ React.createElement("div", null, "Sanctuaries have shops, fountains, and respawn points"), /* @__PURE__ */ React.createElement("div", null, "Death returns you to last sanctuary (\u221225% gold, \u221230% XP)"), /* @__PURE__ */ React.createElement("div", null, "Secret walls \u2588 reveal near INT-based characters"), /* @__PURE__ */ React.createElement("div", null, "\u2605 Champions: rare enemies with 1.5\xD7 stats, 2\xD7 rewards")), player && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: fc.accent, letterSpacing: 2, marginBottom: 6, borderBottom: `1px solid ${fc.accent}22`, paddingBottom: 4 } }, "CLASS: ", player.cls.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 } }, player.skills.map((s, i) => {
     const unlockLvls = [1, 4, 8, 14, 22];
     const unlocked = player.unlocked.includes(s);
     return /* @__PURE__ */ React.createElement("div", { key: s, style: { display: "flex", justifyContent: "space-between", padding: "4px 8px", background: unlocked ? "#0a140e" : "#0c0c16", borderRadius: 6, border: `1px solid ${unlocked ? "#4c63" : "#1e1e2e"}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: unlocked ? "#8c8" : "#444" } }, unlocked ? "\u2726" : "\u{1F512}", " ", s), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555" } }, "Lv", unlockLvls[i] || "?"));
-  })))), menu === "settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "SETTINGS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, fontSize: 11 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u2694\uFE0F DIFFICULTY"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ["easy", "normal", "hard"].map((d) => /* @__PURE__ */ React.createElement("button", { key: d, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.difficulty === d ? fc.accent + "88" : "#2a2a3a", color: settings.difficulty === d ? fc.accent : "#555", textTransform: "uppercase", background: settings.difficulty === d ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, difficulty: d })) }, d))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, settings.difficulty === "easy" ? "Less XP, forgiving combat" : settings.difficulty === "hard" ? "More XP, brutal combat" : "Balanced experience")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F5A5}\uFE0F DISPLAY"), !isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { color: "#666", fontSize: 10, marginBottom: 6 } }, "Tile Size"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [{ l: "Small", v: 11 }, { l: "Medium", v: 13 }, { l: "Large", v: 15 }].map((s) => /* @__PURE__ */ React.createElement("button", { key: s.l, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.tileSize === s.v ? fc.accent + "88" : "#2a2a3a", color: settings.tileSize === s.v ? fc.accent : "#555", background: settings.tileSize === s.v ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((st) => ({ ...st, tileSize: s.v })) }, s.l)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Minimap"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.minimap ? "#4a66" : "#2a2a3a", color: settings.minimap ? "#4a6" : "#555", background: settings.minimap ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, minimap: !s.minimap })) }, settings.minimap ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Music"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.music ? "#4a66" : "#2a2a3a", color: settings.music ? "#4a6" : "#555", background: settings.music ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, music: !s.music })) }, settings.music ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Sound FX"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.sfx ? "#4a66" : "#2a2a3a", color: settings.sfx ? "#4a6" : "#555", background: settings.sfx ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, sfx: !s.sfx })) }, settings.sfx ? "ON" : "OFF"))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F3AE} CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", lineHeight: 1.8, marginBottom: isDesk ? 8 : 0 } }, isDesk ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "WASD / Arrows"), " \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Escape"), " \u2014 Close menu / shop"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Enter / Space"), " \u2014 Confirm")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "D-pad"), " \u2014 Move (bottom-right)"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "\u2630 Menu"), " \u2014 Panels"))), isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", letterSpacing: 1, marginBottom: 6 } }, "KEYBINDS (click to change)"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 } }, [["inv", "Inventory"], ["stats", "Stats"], ["quests", "Quests"], ["armory", "Armory"]].map(([k, label]) => /* @__PURE__ */ React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "#111119", borderRadius: 6, border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#666" } }, label), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 10, padding: "2px 10px", color: fc.accent, borderColor: fc.accent + "44", minWidth: 28, textAlign: "center", textTransform: "uppercase" }, onClick: (ev) => {
+  })))), menu === "settings" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d4a843", letterSpacing: 2, textAlign: "center", marginBottom: 14, fontFamily: "'Cinzel',serif" } }, "SETTINGS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, fontSize: 11 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u2694\uFE0F DIFFICULTY ", player.floor > 1 ? "(locked)" : ""), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ["easy", "normal", "hard"].map((d) => /* @__PURE__ */ React.createElement("button", { key: d, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.difficulty === d ? fc.accent + "88" : "#2a2a3a", color: settings.difficulty === d ? fc.accent : "#555", textTransform: "uppercase", background: settings.difficulty === d ? "rgba(200,168,67,.08)" : "#111119", opacity: player.floor > 1 && settings.difficulty !== d ? 0.4 : 1 }, onClick: () => {
+    if (player.floor > 1) {
+      log("Difficulty locked after Floor 1!", "danger");
+      return;
+    }
+    setSettings((s) => ({ ...s, difficulty: d }));
+  } }, d))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#444", marginTop: 6 } }, settings.difficulty === "easy" ? "Less XP, forgiving combat" : settings.difficulty === "hard" ? "More XP, brutal combat" : "Balanced experience")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F5A5}\uFE0F DISPLAY"), !isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { color: "#666", fontSize: 10, marginBottom: 6 } }, "Tile Size"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, [{ l: "Small", v: 11 }, { l: "Medium", v: 13 }, { l: "Large", v: 15 }].map((s) => /* @__PURE__ */ React.createElement("button", { key: s.l, style: { ...btnS, flex: 1, padding: "8px 0", borderColor: settings.tileSize === s.v ? fc.accent + "88" : "#2a2a3a", color: settings.tileSize === s.v ? fc.accent : "#555", background: settings.tileSize === s.v ? "rgba(200,168,67,.08)" : "#111119" }, onClick: () => setSettings((st) => ({ ...st, tileSize: s.v })) }, s.l)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Minimap"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.minimap ? "#4a66" : "#2a2a3a", color: settings.minimap ? "#4a6" : "#555", background: settings.minimap ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, minimap: !s.minimap })) }, settings.minimap ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Music"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.music ? "#4a66" : "#2a2a3a", color: settings.music ? "#4a6" : "#555", background: settings.music ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, music: !s.music })) }, settings.music ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Sound FX"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.sfx ? "#4a66" : "#2a2a3a", color: settings.sfx ? "#4a6" : "#555", background: settings.sfx ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, sfx: !s.sfx })) }, settings.sfx ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Volume"), /* @__PURE__ */ React.createElement("input", { type: "range", min: "0", max: "100", value: Math.round((settings.volume || 1) * 100), onChange: (e) => {
+    const v = parseInt(e.target.value) / 100;
+    setSettings((s) => ({ ...s, volume: v }));
+  }, style: { width: 100, accentColor: fc.accent } }), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9, width: 28, textAlign: "right" } }, Math.round((settings.volume || 1) * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "Haptic"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.haptic !== false ? "#4a66" : "#2a2a3a", color: settings.haptic !== false ? "#4a6" : "#555", background: settings.haptic !== false ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, haptic: s.haptic === false ? true : false })) }, settings.haptic !== false ? "ON" : "OFF")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, "High Contrast"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 16px", borderColor: settings.colorblind ? "#4a66" : "#2a2a3a", color: settings.colorblind ? "#4a6" : "#555", background: settings.colorblind ? "rgba(68,170,102,.08)" : "#111119" }, onClick: () => setSettings((s) => ({ ...s, colorblind: !s.colorblind })) }, settings.colorblind ? "ON" : "OFF"))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0e0e1a", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#888", fontSize: 10, letterSpacing: 1, marginBottom: 8 } }, "\u{1F3AE} CONTROLS"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", lineHeight: 1.8, marginBottom: isDesk ? 8 : 0 } }, isDesk ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "WASD / Arrows"), " \u2014 Move"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Escape"), " \u2014 Close menu / shop"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "Enter / Space"), " \u2014 Confirm")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "D-pad"), " \u2014 Move (bottom-right)"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, "\u2630 Menu"), " \u2014 Panels"))), isDesk && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", letterSpacing: 1, marginBottom: 6 } }, "KEYBINDS (click to change)"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 } }, [["inv", "Inventory"], ["stats", "Stats"], ["quests", "Quests"], ["armory", "Armory"]].map(([k, label]) => /* @__PURE__ */ React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "#111119", borderRadius: 6, border: "1px solid #1e1e2e" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#666" } }, label), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 10, padding: "2px 10px", color: fc.accent, borderColor: fc.accent + "44", minWidth: 28, textAlign: "center", textTransform: "uppercase" }, onClick: (ev) => {
     ev.target.textContent = "...";
     ev.target.style.color = "#fa0";
     const handler = (e2) => {
@@ -2775,7 +3653,7 @@ function Game() {
     }
     setScreen("title");
     setMenu(null);
-  } }, "\u{1F6AA} Quit to Title"))), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, width: "100%", marginTop: 14, textAlign: "center" }, onClick: () => setMenu(null) }, "Close"))), shop && (() => {
+  } }, "\u{1F6AA} Quit to Title"))))), shop && (() => {
     const conItems = shop.items.filter((i) => i.cat === "consumable");
     const gearItems = shop.items.filter((i) => i.cat === "weapon" || i.cat === "armor");
     const buyItem = (item) => {
@@ -2811,7 +3689,11 @@ function Game() {
     return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(ellipse at center,#0a1828cc,rgba(8,8,14,.98) 60%)", backdropFilter: "blur(6px)", animation: "fadeUp .15s" } }, /* @__PURE__ */ React.createElement("div", { className: "scr", style: { width: "100%", maxWidth: 460, maxHeight: "90vh", overflowY: "auto", background: "rgba(12,16,24,.95)", border: "1px solid #2a4a5a", borderRadius: 12, padding: "18px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 36 } }, shop.icon), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#fa0", letterSpacing: 3, fontFamily: "'Cinzel',serif" } }, shop.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginTop: 4 } }, "Tier ", shop.tier, " Sanctuary \xB7 ", /* @__PURE__ */ React.createElement("span", { style: { color: "#d4a843" } }, "\u{1F4B0} ", player.gold, " gold"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#c64", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #c6422", paddingBottom: 4 } }, "WEAPONS & ARMOR"), gearItems.map((item) => {
       const canBuy = player.gold >= item.buyPrice && item.sold < item.stock;
       const soldOut = item.sold >= item.stock;
-      return /* @__PURE__ */ React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: soldOut ? "#0a0a12" : item.premium ? "#12101a" : "#0c0e16", borderRadius: 8, border: `1px solid ${soldOut ? "#1a1a22" : item.premium ? "#a8642" : "#1e2e3e"}`, marginBottom: 4, opacity: soldOut ? 0.5 : 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: item.premium ? "#fa0" : "#ccc" } }, item.icon, " ", item.name), item.premium && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#fa0", marginLeft: 4 } }, "\u2605 PREMIUM"), item.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", item.floor), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, item.type === "weapon" ? `+${item.atk}ATK${item.intB ? ` +${item.intB}INT` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : item.type === "armor" ? `+${item.def}DEF${item.mpB ? ` +${item.mpB}MP` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : "")), soldOut ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555", padding: "5px 10px" } }, "SOLD OUT") : /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 10, padding: "5px 14px", color: canBuy ? "#fa0" : "#444", borderColor: canBuy ? "#fa06" : "#222" }, onClick: () => buyItem(item), disabled: !canBuy }, "\u{1F4B0}", item.buyPrice));
+      const cur = item.type === "weapon" ? player.equipped.weapon : player.equipped.armor;
+      const diff = item.type === "weapon" ? (item.atk || 0) - (cur?.atk || 0) : (item.def || 0) - (cur?.def || 0);
+      const diffLabel = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : "=";
+      const diffColor = diff > 0 ? "#4c6" : diff < 0 ? "#c44" : "#555";
+      return /* @__PURE__ */ React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: soldOut ? "#0a0a12" : item.premium ? "#12101a" : "#0c0e16", borderRadius: 8, border: `1px solid ${soldOut ? "#1a1a22" : item.premium ? "#a8642" : "#1e2e3e"}`, marginBottom: 4, opacity: soldOut ? 0.5 : 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { color: item.premium ? "#fa0" : "#ccc" } }, item.icon, " ", item.name), item.premium && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#fa0", marginLeft: 4 } }, "\u2605 PREMIUM"), item.floor && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#555", marginLeft: 3 } }, "F", item.floor), !soldOut && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: diffColor, marginLeft: 4, fontWeight: "bold" } }, diffLabel), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "#555", fontSize: 9 } }, item.type === "weapon" ? `+${item.atk}ATK${item.intB ? ` +${item.intB}INT` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : item.type === "armor" ? `+${item.def}DEF${item.mpB ? ` +${item.mpB}MP` : ""}${item.dexB ? ` +${item.dexB}DEX` : ""}` : "")), soldOut ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555", padding: "5px 10px" } }, "SOLD OUT") : /* @__PURE__ */ React.createElement("button", { style: { ...btnS, fontSize: 10, padding: "5px 14px", color: canBuy ? "#fa0" : "#444", borderColor: canBuy ? "#fa06" : "#222" }, onClick: () => buyItem(item), disabled: !canBuy }, "\u{1F4B0}", item.buyPrice));
     }), /* @__PURE__ */ React.createElement("div", { style: { height: 10 } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#4a8", letterSpacing: 2, marginBottom: 6, borderBottom: "1px solid #4a82", paddingBottom: 4 } }, "CONSUMABLES"), conItems.map((item) => {
       const canBuy = player.gold >= item.buyPrice && item.sold < item.stock;
       const soldOut = item.sold >= item.stock;
@@ -2835,7 +3717,16 @@ function Game() {
       filter: e.hp <= 0 ? "grayscale(1) brightness(.3)" : vfx.enemyHit ? "brightness(3)" : "none",
       transition: "filter .2s",
       animation: combat.turn === 1 ? e.isMega || e.isBoss ? "bossIn .7s cubic-bezier(.34,1.56,.64,1)" : "fadeUp .3s" : `enemyIdle 2s ease-in-out infinite${e.isMega ? ", megaGlow 3s infinite" : ""}`
-    } }, e.icon), (e.title || e.subtitle) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#665", fontStyle: "italic", marginTop: 2 } }, e.title || e.subtitle), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 1 } }, "ATK:", e.atk, " DEF:", e.def, e.elem && e.elem !== "physical" ? ` \xB7 ${e.elem}` : ""), (e.burn > 0 || e.freeze > 0 || e.stun > 0) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 2, justifyContent: "center" } }, e.burn > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#f80" } }, "\u{1F525}", e.burn), e.freeze > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#8df" } }, "\u2744\uFE0F", e.freeze), e.stun > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#ff0" } }, "\u26A1", e.stun)), isPlayerTurn && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 7, marginTop: 3, padding: "2px 6px", borderRadius: 4, background: "rgba(0,0,0,.4)", color: e.freeze > 0 ? "#8df" : e.stun > 0 ? "#ff0" : e.hp / e.maxHp < 0.3 ? "#f44" : "#d84", textAlign: "center" } }, e.freeze > 0 ? "\u2744\uFE0F Frozen" : e.stun > 0 ? "\u26A1 Dazed" : e.hp / e.maxHp < 0.3 ? "\u{1F4A2} Enraged" : e.critRate >= 0.12 ? "\u{1F3AF} Aiming" : "\u2694\uFE0F Attack")), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", fontSize: 8, color: "#444" } }, "Turn ", combat.turn)), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 auto", background: "rgba(8,8,14,.95)", borderTop: `1px solid ${aura}22`, padding: "6px 12px", maxHeight: "52vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { ref: cLogRef, className: "scr", style: { maxHeight: 50, overflowY: "auto", marginBottom: 6 } }, cLog.slice(-3).map((m, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 10, color: i === Math.min(cLog.length - 1, 2) ? "#ddd" : "#555", lineHeight: 1.4 } }, m))), isPlayerTurn && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 2, padding: "10px 0", fontSize: 13, borderColor: "#c446", color: "#c44", textAlign: "center" }, onClick: () => pAtk() }, "\u2694\uFE0F Attack"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", fontSize: 12, textAlign: "center" }, onClick: flee }, "\u{1F3C3} Flee"), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", fontSize: 12, textAlign: "center", borderColor: "#4a86", color: "#6be" }, onClick: () => setCInv((c) => !c) }, cInv ? "\u2715" : "\u{1F392}")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3, flexWrap: "wrap" } }, player.unlocked.map((s) => /* @__PURE__ */ React.createElement("button", { key: s, style: { ...btnS, fontSize: 9, padding: "5px 8px", borderColor: "#64a5", color: "#97c" }, onClick: () => pAtk(s) }, s))), cInv && (() => {
+    } }, e.icon), (e.title || e.subtitle) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#665", fontStyle: "italic", marginTop: 2 } }, e.title || e.subtitle), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 1 } }, "ATK:", e.atk, " DEF:", e.def, e.elem && e.elem !== "physical" ? ` \xB7 ${e.elem}` : ""), (e.burn > 0 || e.freeze > 0 || e.stun > 0) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 2, justifyContent: "center" } }, e.burn > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#f80" } }, "\u{1F525}", e.burn), e.freeze > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#8df" } }, "\u2744\uFE0F", e.freeze), e.stun > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#ff0" } }, "\u26A1", e.stun)), isPlayerTurn && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 7, marginTop: 3, padding: "2px 6px", borderRadius: 4, background: "rgba(0,0,0,.4)", color: e.freeze > 0 ? "#8df" : e.stun > 0 ? "#ff0" : e.hp / e.maxHp < 0.3 ? "#f44" : "#d84", textAlign: "center" } }, e.freeze > 0 ? "\u2744\uFE0F Frozen" : e.stun > 0 ? "\u26A1 Dazed" : e.hp / e.maxHp < 0.3 ? "\u{1F4A2} Enraged" : e.critRate >= 0.12 ? "\u{1F3AF} Aiming" : "\u2694\uFE0F Attack")), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", fontSize: 8, color: "#444" } }, "Turn ", combat.turn)), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 auto", background: "rgba(8,8,14,.95)", borderTop: `1px solid ${aura}22`, padding: "6px 12px", maxHeight: "52vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { ref: cLogRef, className: "scr", style: { maxHeight: 50, overflowY: "auto", marginBottom: 6 } }, cLog.slice(-3).map((m, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 10, color: i === Math.min(cLog.length - 1, 2) ? "#ddd" : "#555", lineHeight: 1.4 } }, m))), isPlayerTurn && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5 } }, /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 2, padding: "10px 0", fontSize: 13, borderColor: "#c446", color: "#c44", textAlign: "center" }, onClick: () => pAtk() }, "\u2694\uFE0F Attack ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#555" } }, "[A]")), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", fontSize: 12, textAlign: "center" }, onClick: flee }, "\u{1F3C3} Flee ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#555" } }, "[F]")), /* @__PURE__ */ React.createElement("button", { style: { ...btnS, flex: 1, padding: "10px 0", fontSize: 12, textAlign: "center", borderColor: "#4a86", color: "#6be" }, onClick: () => setCInv((c) => !c) }, cInv ? "\u2715" : "\u{1F392}", " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#555" } }, "[I]"))), e.maxHp < player.maxHp * 0.4 && !e.isBoss && /* @__PURE__ */ React.createElement("button", { style: { ...btnS, padding: "6px 0", fontSize: 9, textAlign: "center", borderColor: "#4c64", color: "#4c6" }, onClick: () => {
+      const autoLoop = () => {
+        setCombat((c) => {
+          if (!c || c.phase !== "player" || c.enemy.hp <= 0) return c;
+          setTimeout(() => pAtk(), 150);
+          return c;
+        });
+      };
+      autoLoop();
+    } }, "\u26A1 Auto-Battle (weak enemy)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3, flexWrap: "wrap" } }, player.unlocked.map((s, si) => /* @__PURE__ */ React.createElement("button", { key: s, style: { ...btnS, fontSize: 9, padding: "5px 8px", borderColor: "#64a5", color: "#97c" }, onClick: () => pAtk(s) }, s, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 7, color: "#444" } }, "[", si + 1, "]")))), cInv && (() => {
       const stacks = {};
       consItems.forEach((c) => {
         const k = c.name;
